@@ -1,181 +1,243 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
-import { TrendingUp, Euro, Award, Package } from 'lucide-react'
+import { Euro, Award, TrendingUp, Package, Users, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 
-const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
+const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
 
 export default function Fatturato() {
   const [ordini, setOrdini] = useState([])
   const [anno, setAnno] = useState(new Date().getFullYear())
+  const [clienteOpen, setClienteOpen] = useState(null)
+  const [meseOpen, setMeseOpen] = useState(null)
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'ordini'), snap => {
-      setOrdini(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.stato !== 'Annullato'))
+    const unsub = onSnapshot(collection(db,'ordini'), snap => {
+      setOrdini(snap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>o.stato!=='Annullato' && o.stato!=='Preventivo'))
     })
     return unsub
   }, [])
 
-  const getAnno = (o) => {
-    if (!o.creatoAl) return null
-    const d = o.creatoAl.seconds ? new Date(o.creatoAl.seconds * 1000) : new Date(o.creatoAl)
-    return d.getFullYear()
-  }
+  const getTs = o => o.creatoAl?.seconds ? new Date(o.creatoAl.seconds*1000) : o.creatoAl ? new Date(o.creatoAl) : null
+  const getAnno = o => getTs(o)?.getFullYear() || null
+  const getMese = o => getTs(o)?.getMonth() ?? null
+  const fmt = ts => { if(!ts) return ''; const d=ts.seconds?new Date(ts.seconds*1000):new Date(ts); return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'}) }
 
-  const getMese = (o) => {
-    if (!o.creatoAl) return null
-    const d = o.creatoAl.seconds ? new Date(o.creatoAl.seconds * 1000) : new Date(o.creatoAl)
-    return d.getMonth()
-  }
+  const oggi = new Date()
+  const inizioOggi = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate())
+  const inizioSettimana = new Date(inizioOggi)
+  inizioSettimana.setDate(inizioOggi.getDate() - inizioOggi.getDay() + (inizioOggi.getDay() === 0 ? -6 : 1))
 
-  const ordiniAnno = ordini.filter(o => getAnno(o) === anno)
+  const ordiniOggi = ordini.filter(o => { const d = getTs(o); return d && d >= inizioOggi })
+  const ordiniSettimana = ordini.filter(o => { const d = getTs(o); return d && d >= inizioSettimana })
 
-  const totaleAnno = ordiniAnno.reduce((s, o) => s + (o.totale || 0), 0)
-  const totaleProvvigione = ordiniAnno.reduce((s, o) => s + (o.totaleProvvigione || 0), 0)
-  const numOrdini = ordiniAnno.length
+  const totOggi = ordiniOggi.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
+  const totSettimana = ordiniSettimana.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
+  const provOggi = ordiniOggi.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
+  const provSettimana = ordiniSettimana.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
 
-  // Per mese
-  const perMese = MESI.map((_, i) => {
-    const del_mese = ordiniAnno.filter(o => getMese(o) === i)
-    return {
-      totale: del_mese.reduce((s, o) => s + (o.totale || 0), 0),
-      provvigione: del_mese.reduce((s, o) => s + (o.totaleProvvigione || 0), 0),
-      num: del_mese.length
-    }
+  const ordiniAnno = ordini.filter(o=>getAnno(o)===anno)
+  const totNetto = ordiniAnno.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
+  const totLordo = ordiniAnno.reduce((s,o)=>s+(o.totaleLordo||o.totale||0),0)
+  const totProv  = ordiniAnno.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
+  const numOrd   = ordiniAnno.length
+
+  const perMese = MESI.map((_,i) => {
+    const om = ordiniAnno.filter(o=>getMese(o)===i)
+    return { netto:om.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0), prov:om.reduce((s,o)=>s+(o.totaleProvvigione||0),0), num:om.length, ordini:om }
   })
+  const maxMese = Math.max(...perMese.map(m=>m.netto),1)
 
-  const maxMese = Math.max(...perMese.map(m => m.totale), 1)
-
-  // Per cliente
   const perCliente = {}
   ordiniAnno.forEach(o => {
-    if (!perCliente[o.clienteNome]) perCliente[o.clienteNome] = { totale: 0, num: 0, provvigione: 0 }
-    perCliente[o.clienteNome].totale += o.totale || 0
-    perCliente[o.clienteNome].provvigione += o.totaleProvvigione || 0
+    if(!perCliente[o.clienteNome]) perCliente[o.clienteNome]={netto:0,lordo:0,prov:0,num:0,ordini:[]}
+    perCliente[o.clienteNome].netto  += o.totaleNetto||o.totale||0
+    perCliente[o.clienteNome].lordo  += o.totaleLordo||o.totale||0
+    perCliente[o.clienteNome].prov   += o.totaleProvvigione||0
     perCliente[o.clienteNome].num++
+    perCliente[o.clienteNome].ordini.push(o)
   })
-  const topClienti = Object.entries(perCliente)
-    .sort((a, b) => b[1].totale - a[1].totale)
-    .slice(0, 5)
+  const topClienti = Object.entries(perCliente).sort((a,b)=>b[1].netto-a[1].netto)
 
-  // Per prodotto
-  const perProdotto = {}
-  ordiniAnno.forEach(o => {
-    (o.righe || []).forEach(r => {
-      if (!perProdotto[r.nome]) perProdotto[r.nome] = { totale: 0, qta: 0 }
-      perProdotto[r.nome].totale += r.qta * r.prezzoUnitario
-      perProdotto[r.nome].qta += r.qta
-    })
-  })
-  const topProdotti = Object.entries(perProdotto)
-    .sort((a, b) => b[1].totale - a[1].totale)
-    .slice(0, 5)
+  const perProd = {}
+  ordiniAnno.forEach(o => (o.righe||[]).forEach(r => {
+    if(!perProd[r.nome]) perProd[r.nome]={tot:0,qta:0}
+    perProd[r.nome].tot += r.qta*r.prezzoUnitario
+    perProd[r.nome].qta += r.qta
+  }))
+  const topProd = Object.entries(perProd).sort((a,b)=>b[1].tot-a[1].tot).slice(0,5)
 
-  const anni = [...new Set(ordini.map(getAnno).filter(Boolean))].sort((a, b) => b - a)
-  if (!anni.includes(anno)) anni.unshift(anno)
+  const anni = [...new Set(ordini.map(getAnno).filter(Boolean))].sort((a,b)=>b-a)
+  if(!anni.includes(anno)) anni.unshift(anno)
 
   return (
-    <div className="max-w-xl mx-auto px-4 pt-5 pb-6">
+    <div className="max-w-xl mx-auto px-4 pt-5 pb-8">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">Fatturato</h1>
-        <select className="input-field w-auto text-sm py-2"
-          value={anno} onChange={e => setAnno(Number(e.target.value))}>
-          {anni.map(a => <option key={a}>{a}</option>)}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Fatturato</h1>
+          <div className="flex items-center gap-1 text-xs text-amber-600 mt-0.5"><Lock size={11}/> Sezione privata</div>
+        </div>
+        <select className="input-field w-auto text-sm py-2" value={anno} onChange={e=>setAnno(Number(e.target.value))}>
+          {anni.map(a=><option key={a}>{a}</option>)}
         </select>
       </div>
 
-      {/* KPI */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="card text-center">
-          <Euro size={20} className="text-blue-500 mx-auto mb-1" />
-          <div className="text-xl font-bold text-gray-900">€{totaleAnno.toFixed(0)}</div>
-          <div className="text-xs text-gray-400">Venduto</div>
+      {/* OGGI E SETTIMANA */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-center">
+          <div className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">☀️ Oggi</div>
+          <div className="text-2xl font-bold text-blue-800">€{totOggi.toFixed(0)}</div>
+          <div className="text-xs text-blue-500">{ordiniOggi.length} ordini</div>
+          <div className="text-xs text-amber-600 mt-0.5 flex items-center justify-center gap-1"><Lock size={10}/> €{provOggi.toFixed(0)}</div>
         </div>
-        <div className="card text-center">
-          <Award size={20} className="text-green-500 mx-auto mb-1" />
-          <div className="text-xl font-bold text-green-700">€{totaleProvvigione.toFixed(0)}</div>
-          <div className="text-xs text-gray-400">Provvigioni</div>
-        </div>
-        <div className="card text-center">
-          <TrendingUp size={20} className="text-purple-500 mx-auto mb-1" />
-          <div className="text-xl font-bold text-gray-900">{numOrdini}</div>
-          <div className="text-xs text-gray-400">Ordini</div>
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 text-center">
+          <div className="text-xs font-bold text-emerald-500 uppercase tracking-wide mb-1">📅 Settimana</div>
+          <div className="text-2xl font-bold text-emerald-800">€{totSettimana.toFixed(0)}</div>
+          <div className="text-xs text-emerald-500">{ordiniSettimana.length} ordini</div>
+          <div className="text-xs text-amber-600 mt-0.5 flex items-center justify-center gap-1"><Lock size={10}/> €{provSettimana.toFixed(0)}</div>
         </div>
       </div>
 
-      {/* GRAFICO MENSILE */}
+      {/* KPI ANNO */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="card text-center">
+          <Euro size={20} className="text-gray-400 mx-auto mb-1"/>
+          <div className="text-xs text-gray-400 mb-0.5">Imponibile {anno}</div>
+          <div className="text-2xl font-bold text-gray-900">€{totNetto.toFixed(0)}</div>
+        </div>
+        <div className="card text-center">
+          <Euro size={20} className="text-blue-500 mx-auto mb-1"/>
+          <div className="text-xs text-gray-400 mb-0.5">Totale + IVA</div>
+          <div className="text-2xl font-bold text-blue-700">€{totLordo.toFixed(0)}</div>
+        </div>
+        <div className="card text-center col-span-2 bg-amber-50 border-amber-200">
+          <div className="flex items-center justify-center gap-1 mb-1"><Lock size={14} className="text-amber-500"/><Award size={20} className="text-amber-500"/></div>
+          <div className="text-xs text-amber-600 mb-0.5">Mia Provvigione {anno}</div>
+          <div className="text-3xl font-bold text-amber-700">€{totProv.toFixed(2)}</div>
+          <div className="text-xs text-amber-500 mt-1">{numOrd} ordini</div>
+        </div>
+      </div>
+
+      {/* PROVVIGIONI MESE PER MESE */}
       <div className="card mb-5">
-        <div className="text-sm font-bold text-gray-700 mb-4">Andamento mensile</div>
-        <div className="flex items-end gap-1 h-32">
-          {perMese.map((m, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex flex-col justify-end" style={{ height: '96px' }}>
-                <div
-                  className="w-full bg-blue-500 rounded-t-sm transition-all duration-500"
-                  style={{ height: `${maxMese > 0 ? (m.totale / maxMese) * 96 : 0}px`, minHeight: m.totale > 0 ? 4 : 0 }}
-                  title={`€${m.totale.toFixed(2)}`}
-                />
-              </div>
-              <div className="text-xs text-gray-400">{MESI[i]}</div>
+        <div className="flex items-center gap-2 mb-4">
+          <Lock size={14} className="text-amber-500"/>
+          <div className="text-sm font-bold text-gray-700">Provvigioni mese per mese</div>
+        </div>
+        <div className="flex flex-col gap-1">
+          {perMese.map((m,i) => (
+            <div key={i}>
+              <button className="w-full" onClick={()=>setMeseOpen(meseOpen===i?null:i)}>
+                <div className="flex items-center gap-3 py-2">
+                  <div className="w-8 text-xs font-bold text-gray-500 shrink-0">{MESI[i]}</div>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div className="bg-amber-400 h-2 rounded-full transition-all" style={{width:`${(m.netto/maxMese)*100}%`}}/>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold text-gray-900">€{m.netto.toFixed(0)}</div>
+                    <div className="text-xs text-amber-600">€{m.prov.toFixed(0)} prov.</div>
+                  </div>
+                  {m.num>0 && (meseOpen===i?<ChevronUp size={14} className="text-gray-400 shrink-0"/>:<ChevronDown size={14} className="text-gray-400 shrink-0"/>)}
+                </div>
+              </button>
+              {meseOpen===i && m.ordini.length>0 && (
+                <div className="ml-11 mb-2 bg-amber-50 rounded-xl p-3">
+                  {m.ordini.map(o=>(
+                    <div key={o.id} className="flex justify-between text-sm py-1 border-b border-amber-100 last:border-0">
+                      <div><div className="font-semibold text-gray-800">{o.clienteNome}</div>
+                        <div className="text-xs text-gray-400">{fmt(o.creatoAl)}</div></div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-900">€{Number(o.totaleNetto||o.totale||0).toFixed(2)}</div>
+                        <div className="text-xs text-amber-600">€{Number(o.totaleProvvigione||0).toFixed(2)} prov.</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between font-bold text-sm pt-2 mt-1 border-t border-amber-200">
+                    <span>Totale {MESI[i]}</span>
+                    <div className="text-right"><div>€{m.netto.toFixed(2)}</div><div className="text-amber-600">€{m.prov.toFixed(2)} prov.</div></div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* TOP CLIENTI */}
-      {topClienti.length > 0 && (
+      {/* FATTURATO PER CLIENTE */}
+      {topClienti.length>0 && (
         <div className="card mb-5">
-          <div className="text-sm font-bold text-gray-700 mb-3">Top Clienti</div>
-          <div className="flex flex-col gap-2">
-            {topClienti.map(([nome, dati], i) => (
-              <div key={nome}>
-                <div className="flex justify-between items-center mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                    <span className="text-sm font-semibold text-gray-800 truncate max-w-[160px]">{nome}</span>
-                    <span className="text-xs text-gray-400">{dati.num} ord.</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-gray-900">€{dati.totale.toFixed(0)}</div>
-                    <div className="text-xs text-green-600">€{dati.provvigione.toFixed(0)}</div>
-                  </div>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                  <div className="bg-blue-500 h-1.5 rounded-full"
-                    style={{ width: `${(dati.totale / (topClienti[0][1].totale || 1)) * 100}%` }} />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-2 mb-3">
+            <Users size={16} className="text-gray-500"/>
+            <div className="text-sm font-bold text-gray-700">Fatturato per Cliente {anno}</div>
           </div>
+          {topClienti.map(([nome,d],i) => (
+            <div key={nome}>
+              <button className="w-full text-left" onClick={()=>setClienteOpen(clienteOpen===nome?null:nome)}>
+                <div className="flex justify-between items-center py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-400 w-5">{i+1}</span>
+                    <div><div className="text-sm font-semibold text-gray-800">{nome}</div>
+                      <div className="text-xs text-gray-400">{d.num} ordini</div></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-gray-900">€{d.netto.toFixed(0)}</div>
+                      <div className="text-xs text-amber-600">€{d.prov.toFixed(0)} prov.</div>
+                    </div>
+                    {clienteOpen===nome?<ChevronUp size={14} className="text-gray-400"/>:<ChevronDown size={14} className="text-gray-400"/>}
+                  </div>
+                </div>
+                <div className="ml-7 w-full bg-gray-100 rounded-full h-1.5 mb-1">
+                  <div className="bg-blue-500 h-1.5 rounded-full" style={{width:`${(d.netto/(topClienti[0][1].netto||1))*100}%`}}/>
+                </div>
+              </button>
+              {clienteOpen===nome && (
+                <div className="ml-7 mb-2 bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Storico ordini</div>
+                  {d.ordini.sort((a,b)=>(b.creatoAl?.seconds||0)-(a.creatoAl?.seconds||0)).map(o=>(
+                    <div key={o.id} className="flex justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
+                      <div><div className="text-gray-700">{fmt(o.creatoAl)}</div>
+                        <div className="text-xs text-gray-400">{o.stato}</div></div>
+                      <div className="text-right">
+                        <div className="font-semibold">€{Number(o.totaleNetto||o.totale||0).toFixed(2)}</div>
+                        <div className="text-xs text-blue-600">+IVA €{Number(o.totaleLordo||0).toFixed(2)}</div>
+                        <div className="text-xs text-amber-600">€{Number(o.totaleProvvigione||0).toFixed(2)} prov.</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between font-bold text-sm pt-2 mt-1 border-t border-gray-200">
+                    <span>Totale {anno}</span>
+                    <div className="text-right"><div>€{d.lordo.toFixed(2)} (IVA incl.)</div>
+                      <div className="text-amber-600">€{d.prov.toFixed(2)} prov.</div></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
       {/* TOP PRODOTTI */}
-      {topProdotti.length > 0 && (
+      {topProd.length>0 && (
         <div className="card">
-          <div className="text-sm font-bold text-gray-700 mb-3">
-            <Package size={15} className="inline mr-1" />
-            Top Prodotti
+          <div className="flex items-center gap-2 mb-3">
+            <Package size={16} className="text-gray-500"/>
+            <div className="text-sm font-bold text-gray-700">Top Prodotti {anno}</div>
           </div>
-          <div className="flex flex-col gap-2">
-            {topProdotti.map(([nome, dati], i) => (
-              <div key={nome} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                  <div>
-                    <div className="text-sm font-semibold text-gray-800">{nome}</div>
-                    <div className="text-xs text-gray-400">Qtà: {dati.qta}</div>
-                  </div>
-                </div>
-                <div className="font-bold text-gray-900 text-sm">€{dati.totale.toFixed(0)}</div>
+          {topProd.map(([nome,d],i)=>(
+            <div key={nome} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-400 w-4">{i+1}</span>
+                <div><div className="text-sm font-semibold text-gray-800">{nome}</div>
+                  <div className="text-xs text-gray-400">Qtà: {d.qta}</div></div>
               </div>
-            ))}
-          </div>
+              <div className="font-bold text-gray-900 text-sm">€{d.tot.toFixed(0)}</div>
+            </div>
+          ))}
         </div>
       )}
 
-      {ordini.length === 0 && (
+      {ordini.length===0 && (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-3">📊</div>
           <div className="text-lg font-semibold">Nessun dato</div>
