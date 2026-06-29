@@ -90,8 +90,8 @@ export default function Ordini() {
       </div>
 
       {/* FILTRO STATO */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        {['', 'Inviato', 'Confermato', 'In lavorazione', 'Spedito', 'Consegnato', 'Annullato'].map(s => (
+      {['Inviato', 'Spedito'].map(s => (
+                o.stato !== s && (
           <button key={s} onClick={() => setFiltroStato(s)}
             className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
               filtroStato === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'
