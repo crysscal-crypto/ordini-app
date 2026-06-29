@@ -5,9 +5,9 @@ import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, 
 import OrdineModal from '../components/OrdineModal'
 
 const STATI = {
-  'Preventivo': { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'   },
-  'Inviato':    { bg: 'bg-blue-50',    text: 'text-blue-700',   border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'   },
-  'Spedito':    { bg: 'bg-purple-50',  text: 'text-purple-700', border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
+  'Preventivo': { bg: 'bg-gray-100',  border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
+  'Inviato':    { bg: 'bg-blue-50',   border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'    },
+  'Spedito':    { bg: 'bg-purple-50', border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
 }
 
 const EMAIL_AZIENDA = 'ordini@cococera.it'
@@ -82,6 +82,7 @@ export default function Ordini() {
 
   return (
     <div className="max-w-xl mx-auto px-4 pt-5">
+
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ordini</h1>
@@ -136,6 +137,7 @@ export default function Ordini() {
             const cfg = STATI[o.stato] || STATI['Preventivo']
             return (
               <div key={o.id} className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${cfg.border} overflow-hidden`}>
+
                 <div className={`px-4 pt-4 pb-3 ${cfg.bg}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -178,6 +180,15 @@ export default function Ordini() {
 
                 {espanso === o.id && (
                   <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-100 pt-3">
+
+                    {/* TASTO INVIA ORDINE - solo per preventivi */}
+                    {o.stato === 'Preventivo' && (
+                      <button onClick={() => aggiornaStato(o.id, 'Inviato')}
+                        className="w-full bg-green-500 text-white font-bold py-4 rounded-2xl text-base active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2">
+                        <Send size={20}/> 📤 Invia Ordine
+                      </button>
+                    )}
+
                     {o.righe?.length > 0 && (
                       <div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
@@ -196,6 +207,7 @@ export default function Ordini() {
                         </div>
                       </div>
                     )}
+
                     {o.indirizzoConsegna && (
                       <div className="flex gap-2 items-start text-sm bg-gray-50 rounded-xl p-3">
                         <MapPin size={15} className="text-gray-400 mt-0.5 shrink-0" />
@@ -208,6 +220,7 @@ export default function Ordini() {
                         <span className="text-gray-700">{o.note}</span>
                       </div>
                     )}
+
                     <div className="grid grid-cols-3 gap-2 mt-1">
                       <button onClick={() => setModal(o)}
                         className="bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm active:scale-95 flex flex-col items-center gap-1">
