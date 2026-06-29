@@ -23,7 +23,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
   const selCliente = (c) => {
-    const indSpedDef = c.spedizioneUgualeResidenza
+    const indirizzo = c.spedizioneUgualeResidenza !== false
       ? [c.indirizzo, c.cap, c.citta, c.provincia].filter(Boolean).join(', ')
       : [c.indirizzoSpedizione, c.capSpedizione, c.cittaSpedizione, c.provinciaSpedizione].filter(Boolean).join(', ')
     setForm(f => ({
@@ -33,7 +33,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
       clienteEmail: c.email||'',
       clientePagamento: c.pagamento||'',
       clienteGiornoChiusura: c.giornoChiusura||'',
-      indirizzoConsegna: indSpedDef
+      indirizzoConsegna: indirizzo || f.indirizzoConsegna
     }))
   }
 
@@ -116,7 +116,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             {clienteSel && (
               <div className="mt-2 bg-blue-50 rounded-xl p-3 text-sm">
                 <div className="font-bold text-blue-900">{clienteSel.ragioneSociale}</div>
-                <div className="text-blue-600 text-xs mt-0.5">💳 {clienteSel.pagamento}</div>
                 {clienteSel.email && <div className="text-blue-600 text-xs">{clienteSel.email}</div>}
                 {form.indirizzoConsegna && <div className="text-blue-600 text-xs">📍 {form.indirizzoConsegna}</div>}
                 {clienteSel.giornoChiusura && clienteSel.giornoChiusura!=='—' && (
@@ -129,6 +128,11 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Indirizzo Consegna</label>
             <input className="input-field" value={form.indirizzoConsegna} onChange={e=>set('indirizzoConsegna',e.target.value)} placeholder="Via, numero, città..."/>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Modalità Pagamento</label>
+            <input className="input-field" value={form.clientePagamento} onChange={e=>set('clientePagamento',e.target.value)} placeholder="Bonifico 30 gg..."/>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -149,7 +153,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             <button onClick={()=>setShowProd(v=>!v)} className="btn-primary w-full mb-3">
               <Plus size={20}/> Aggiungi Prodotto {showProd?<ChevronUp size={18}/>:<ChevronDown size={18}/>}
             </button>
-
             {showProd && (
               <div className="border-2 border-blue-200 rounded-xl overflow-hidden mb-3">
                 <div className="p-3 bg-blue-50 flex flex-col gap-2">
@@ -182,9 +185,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
                               <button onClick={()=>updRiga(form.righe.indexOf(inOrdine),'qta',inOrdine.qta+1)} className="p-1.5 text-gray-500"><Plus size={14}/></button>
                             </div>
                           ) : (
-                            <button onClick={()=>addProdotto(p)} className="bg-blue-600 text-white rounded-lg p-2 active:scale-95 shrink-0">
-                              <Plus size={16}/>
-                            </button>
+                            <button onClick={()=>addProdotto(p)} className="bg-blue-600 text-white rounded-lg p-2 active:scale-95 shrink-0"><Plus size={16}/></button>
                           )}
                         </div>
                       )
@@ -193,7 +194,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
                 </div>
               </div>
             )}
-
             {form.righe.length>0 && (
               <div className="flex flex-col gap-2">
                 {form.righe.map((r,i)=>(
