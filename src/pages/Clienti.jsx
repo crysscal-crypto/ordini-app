@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
-import { Plus, Search, Phone, Mail, Trash2, Edit2, ChevronRight, CreditCard } from 'lucide-react'
+import { Plus, Search, Phone, Mail, Trash2, Edit2, CreditCard, MapPin } from 'lucide-react'
 import ClienteModal from '../components/ClienteModal'
+
+const STATO_CONFIG = {
+  'Attivo':   { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
+  'Prospect': { bg: 'bg-blue-100',  text: 'text-blue-700',  dot: 'bg-blue-500'  },
+  'Inattivo': { bg: 'bg-gray-100',  text: 'text-gray-600',  dot: 'bg-gray-400'  },
+  'Perso':    { bg: 'bg-red-100',   text: 'text-red-600',   dot: 'bg-red-500'   },
+}
 
 export default function Clienti() {
   const [clienti, setClienti] = useState([])
   const [search, setSearch] = useState('')
-  const [modal, setModal] = useState(null) // null | 'nuovo' | cliente
+  const [filtroStato, setFiltroStato] = useState('')
+  const [modal, setModal] = useState(null)
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'clienti'), snap => {
@@ -17,11 +25,13 @@ export default function Clienti() {
     return unsub
   }, [])
 
-  const filtrati = clienti.filter(c =>
-    c.ragioneSociale?.toLowerCase().includes(search.toLowerCase()) ||
-    c.referente?.toLowerCase().includes(search.toLowerCase()) ||
-    c.citta?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtrati = clienti.filter(c => {
+    const matchSearch = c.ragioneSociale?.toLowerCase().includes(search.toLowerCase()) ||
+      c.referente?.toLowerCase().includes(search.toLowerCase()) ||
+      c.citta?.toLowerCase().includes(search.toLowerCase())
+    const matchStato = !filtroStato || c.stato === filtroStato
+    return matchSearch && matchStato
+  })
 
   const salva = async (form) => {
     if (modal?.id) {
@@ -37,13 +47,7 @@ export default function Clienti() {
     await deleteDoc(doc(db, 'clienti', id))
   }
 
-  const statoColore = {
-    'Bonifico': 'bg-blue-100 text-blue-700',
-    'Contanti': 'bg-green-100 text-green-700',
-    '30 gg': 'bg-amber-100 text-amber-700',
-    '60 gg': 'bg-orange-100 text-orange-700',
-    '90 gg': 'bg-red-100 text-red-700',
-  }
+  const contaPerStato = (stato) => clienti.filter(c => c.stato === stato).length
 
   return (
     <div className="max-w-xl mx-auto px-4 pt-5">
@@ -57,18 +61,29 @@ export default function Clienti() {
         </button>
       </div>
 
+      {/* STATO PILLS */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        <button onClick={() => setFiltroStato('')}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+            !filtroStato ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}>
+          Tutti ({clienti.length})
+        </button>
+        {Object.entries(STATO_CONFIG).map(([stato, cfg]) => (
+          <button key={stato} onClick={() => setFiltroStato(stato === filtroStato ? '' : stato)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+              filtroStato === stato ? `${cfg.bg} ${cfg.text} border-current` : 'bg-white text-gray-500 border-gray-200'}`}>
+            {stato} ({contaPerStato(stato)})
+          </button>
+        ))}
+      </div>
+
       {/* SEARCH */}
       <div className="relative mb-4">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="input-field pl-10"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Cerca cliente, città..."
-        />
+        <input className="input-field pl-10" value={search}
+          onChange={e => setSearch(e.target.value)} placeholder="Cerca cliente, città..." />
       </div>
 
-      {/* LISTA */}
       {filtrati.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-3">👥</div>
@@ -77,39 +92,61 @@ export default function Clienti() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {filtrati.map(c => (
-            <div key={c.id} className="card">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-gray-900 text-base truncate">{c.ragioneSociale}</div>
-                  {c.referente && <div className="text-sm text-gray-500">{c.referente}</div>}
-                  {c.citta && <div className="text-sm text-gray-400">{c.citta}</div>}
-                  <div className="mt-2 flex flex-wrap gap-2 items-center">
-                    {c.pagamento && (
-                      <span className={`badge ${statoColore[c.pagamento] || 'bg-gray-100 text-gray-600'}`}>
-                        <CreditCard size={11} className="inline mr-1" />{c.pagamento}
-                      </span>
+          {filtrati.map(c => {
+            const cfg = STATO_CONFIG[c.stato] || STATO_CONFIG['Attivo']
+            return (
+              <div key={c.id} className="card">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`inline-block w-2 h-2 rounded-full ${cfg.dot}`} />
+                      <span className="font-bold text-gray-900 text-base truncate">{c.ragioneSociale}</span>
+                    </div>
+                    {c.referente && <div className="text-sm text-gray-500 ml-4">{c.referente}</div>}
+                    {(c.citta || c.indirizzo) && (
+                      <div className="text-xs text-gray-400 ml-4 flex items-center gap-1 mt-0.5">
+                        <MapPin size={11}/>{[c.indirizzo, c.citta, c.provincia].filter(Boolean).join(', ')}
+                      </div>
                     )}
-                    {c.telefono && (
-                      <a href={`tel:${c.telefono}`} className="badge bg-gray-100 text-gray-600 flex items-center gap-1">
-                        <Phone size={11} />{c.telefono}
-                      </a>
-                    )}
+                    <div className="mt-2 ml-4 flex flex-wrap gap-2 items-center">
+                      <span className={`badge ${cfg.bg} ${cfg.text}`}>{c.stato || 'Attivo'}</span>
+                      {c.pagamento && (
+                        <span className="badge bg-amber-100 text-amber-700">
+                          <CreditCard size={10} className="inline mr-1"/>{c.pagamento}
+                        </span>
+                      )}
+                      {c.giornoChiusura && c.giornoChiusura !== '—' && (
+                        <span className="badge bg-orange-100 text-orange-700">⚠️ Chiuso {c.giornoChiusura}</span>
+                      )}
+                      {c.piva && <span className="badge bg-gray-100 text-gray-500 font-mono text-xs">P.IVA {c.piva}</span>}
+                    </div>
+                    <div className="mt-2 ml-4 flex gap-3">
+                      {c.telefono && (
+                        <a href={`tel:${c.telefono}`} className="text-sm text-blue-600 flex items-center gap-1">
+                          <Phone size={13}/>{c.telefono}
+                        </a>
+                      )}
+                      {c.email && (
+                        <a href={`mailto:${c.email}`} className="text-sm text-blue-600 flex items-center gap-1 truncate max-w-[150px]">
+                          <Mail size={13}/>{c.email}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-3 shrink-0">
+                    <button onClick={() => setModal(c)}
+                      className="p-2.5 bg-blue-50 text-blue-600 rounded-xl active:scale-95">
+                      <Edit2 size={18}/>
+                    </button>
+                    <button onClick={() => elimina(c.id)}
+                      className="p-2.5 bg-red-50 text-red-500 rounded-xl active:scale-95">
+                      <Trash2 size={18}/>
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2 ml-3 shrink-0">
-                  <button onClick={() => setModal(c)}
-                    className="p-2.5 bg-blue-50 text-blue-600 rounded-xl active:scale-95">
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => elimina(c.id)}
-                    className="p-2.5 bg-red-50 text-red-500 rounded-xl active:scale-95">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
