@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
 
-const PAGAMENTI = ['Contanti', 'Bonifico', '30 gg', '60 gg', '90 gg', 'RID', 'Assegno', 'Altro']
+const PAGAMENTI_PRESET = [
+  'Riba 30',
+  'Riba 30/60',
+  'Riba 30/60/90/120',
+  'RID 30',
+  'RID 30/60',
+  'RID 30/60/90',
+  'RID 30/60/90/120',
+  'Bonifico Anticipato',
+  'Contrassegno',
+  'Personalizzato...'
+]
 
 const vuoto = {
   ragioneSociale: '', referente: '', telefono: '', email: '',
