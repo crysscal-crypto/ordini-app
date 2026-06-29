@@ -2,16 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
 
 const PAGAMENTI_PRESET = [
-  'Riba 30',
-  'Riba 30/60',
-  'Riba 30/60/90/120',
-  'RID 30',
-  'RID 30/60',
-  'RID 30/60/90',
-  'RID 30/60/90/120',
-  'Bonifico Anticipato',
-  'Contrassegno',
-  'Personalizzato...'
+  'Riba 30','Riba 30/60','Riba 30/60/90/120',
+  'RID 30','RID 30/60','RID 30/60/90','RID 30/60/90/120',
+  'Bonifico Anticipato','Contrassegno','Personalizzato...'
 ]
 const STATI = [
   { val:'Attivo',   col:'bg-green-100 text-green-700 border-green-400' },
@@ -30,6 +23,11 @@ const vuoto = {
   pagamento:'Riba 30', pagamentoPersonalizzato:'',
   iban:'', giornoChiusura:'—', note:'', stato:'Attivo'
 }
+
+// ⚠️ Field FUORI dalla funzione principale — fix bug focus
+const Field = ({ label, children }) => (
+  <div><label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>{children}</div>
+)
 
 export default function ClienteModal({ cliente, onSave, onClose }) {
   const [form, setForm] = useState(vuoto)
@@ -55,10 +53,6 @@ export default function ClienteModal({ cliente, onSave, onClose }) {
     const pag = pagCustom ? (form.pagamentoPersonalizzato || 'Personalizzato') : form.pagamento
     onSave({ ...form, pagamento: pag })
   }
-
-  const Field = ({ label, children }) => (
-    <div><label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>{children}</div>
-  )
 
   return (
     <div className="modal-overlay">
