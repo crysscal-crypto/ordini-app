@@ -5,9 +5,9 @@ import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, 
 import OrdineModal from '../components/OrdineModal'
 
 const STATI = {
-  'Preventivo': { bg: 'bg-gray-100',   border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
-  'Inviato':    { bg: 'bg-blue-50',    border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'    },
-  'Spedito':    { bg: 'bg-purple-50',  border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
+  'Preventivo': { bg: 'bg-gray-100',  border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
+  'In Pending': { bg: 'bg-blue-50',   border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'    },
+  'Spedito':    { bg: 'bg-purple-50', border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
 }
 
 const EMAIL_AZIENDA = 'ordini@cococera.it'
@@ -97,7 +97,7 @@ export default function Ordini() {
       <div className="grid grid-cols-3 gap-2 mb-5">
         {[
           { stato: 'Preventivo', emoji: '📝', color: 'bg-gray-100 border-gray-300' },
-          { stato: 'Inviato',    emoji: '📤', color: 'bg-blue-50 border-blue-300'  },
+          { stato: 'In Pending', emoji: '⏳', color: 'bg-blue-50 border-blue-300'  },
           { stato: 'Spedito',    emoji: '🚚', color: 'bg-purple-50 border-purple-300' },
         ].map(({ stato, emoji, color }) => (
           <button key={stato} onClick={() => setFiltroStato(filtroStato === stato ? '' : stato)}
@@ -116,7 +116,7 @@ export default function Ordini() {
       </div>
 
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {['', 'Preventivo', 'Inviato', 'Spedito'].map(s => (
+        {['', 'Preventivo', 'In Pending', 'Spedito'].map(s => (
           <button key={s} onClick={() => setFiltroStato(s)}
             className={`shrink-0 px-4 py-2.5 rounded-2xl text-sm font-bold border-2 transition-all active:scale-95 ${
               filtroStato === s ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-gray-500 border-gray-200'}`}>
@@ -161,14 +161,17 @@ export default function Ordini() {
                 </div>
 
                 <div className="px-4 py-2 flex gap-2 border-b border-gray-100">
-                  {['Inviato', 'Spedito'].map(s => (
-                    o.stato !== s && (
-                      <button key={s} onClick={() => aggiornaStato(o.id, s)}
-                        className={`text-xs font-bold px-4 py-2 rounded-xl border-2 active:scale-95 transition-all ${STATI[s].pill} border-current`}>
-                        → {s}
-                      </button>
-                    )
-                  ))}
+                  {o.stato === 'Preventivo' && (
+                    <button onClick={() => aggiornaStato(o.id, 'In Pending')}
+                      className={`text-xs font-bold px-4 py-2 rounded-xl border-2 active:scale-95 transition-all ${STATI['In Pending'].pill} border-current`}>
+                      → In Pending
+                    </button>
+                  )}
+                  {o.stato === 'Spedito' && (
+                    <span className="text-xs font-bold px-4 py-2 rounded-xl bg-purple-100 text-purple-700">
+                      ✓ Inviato in azienda
+                    </span>
+                  )}
                 </div>
 
                 <button onClick={() => setEspanso(espanso === o.id ? null : o.id)}
@@ -180,9 +183,9 @@ export default function Ordini() {
                 {espanso === o.id && (
                   <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-100 pt-3">
                     {o.stato === 'Preventivo' && (
-                      <button onClick={() => aggiornaStato(o.id, 'Inviato')}
+                      <button onClick={() => aggiornaStato(o.id, 'In Pending')}
                         className="w-full bg-green-500 text-white font-bold py-4 rounded-2xl text-base active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2">
-                        <Send size={20}/> 📤 Invia Ordine
+                        <Send size={20}/> 📤 Conferma Ordine
                       </button>
                     )}
 
