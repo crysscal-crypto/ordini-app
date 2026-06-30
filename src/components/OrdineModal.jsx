@@ -6,7 +6,7 @@ import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl
 const IVA = 0.22
 const EMAIL_AZIENDA = 'ordini@cococera.it'
 const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
-const STATI = ['Preventivo', 'Inviato', 'Spedito']
+const STATI = ['Preventivo', 'In Pending', 'Spedito']
 
 const vuoto = {
   brand: 'Coco Cera',
@@ -106,7 +106,12 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
           note: form.note || 'Nessuna nota',
         }, EMAILJS_PUBLIC_KEY)
       }
-      alert('✅ Email inviata con successo!')
+
+      const includeAzienda = form.invioEmail === 'azienda' || form.invioEmail === 'entrambi'
+      const nuovoStato = includeAzienda ? 'Spedito' : form.stato
+
+      onSave({ ...form, stato: nuovoStato, totaleNetto:totNetto, totaleIVA:totIVA, totaleLordo:totLordo, totaleProvvigione:totProv })
+      alert(includeAzienda ? '✅ Ordine spedito in azienda! Stato aggiornato a "Spedito"' : '✅ Email inviata al cliente!')
     } catch (err) {
       alert('❌ Errore invio email: ' + (err.text || err.message || 'Errore sconosciuto'))
     } finally {
@@ -280,6 +285,11 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
               Azienda: <strong>{EMAIL_AZIENDA}</strong>
               {clienteSel?.email && <><br/>Cliente: <strong>{clienteSel.email}</strong></>}
             </div>
+            {(form.invioEmail === 'azienda' || form.invioEmail === 'entrambi') && (
+              <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-2 text-xs text-purple-700">
+                ⚠️ Inviando all'azienda, l'ordine passerà automaticamente a stato <strong>Spedito</strong>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 mt-2">
