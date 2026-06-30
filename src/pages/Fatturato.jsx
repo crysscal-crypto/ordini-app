@@ -76,6 +76,20 @@ export default function Fatturato() {
   }))
   const topProd = Object.entries(perProd).sort((a,b)=>b[1].tot-a[1].tot).slice(0,5)
 
+  const clienteOpenTotaliAnnui = (clienteOrdini) => {
+    const perAnno = {}
+    clienteOrdini.forEach(o => {
+      const a = getAnno(o)
+      if (a === null) return
+      if (!perAnno[a]) perAnno[a] = {}
+      ;(o.righe||[]).forEach(r => {
+        if (!perAnno[a][r.nome]) perAnno[a][r.nome] = 0
+        perAnno[a][r.nome] += r.qta
+      })
+    })
+    return Object.entries(perAnno).sort((a,b) => b[0]-a[0])
+  }
+
   const clienteOpenStoricoProdotti = (clienteOrdini) => {
     const perAnnoMese = {}
     clienteOrdini.forEach(o => {
@@ -260,6 +274,23 @@ export default function Fatturato() {
                     <span>Totale {anno}</span>
                     <div className="text-right"><div>€{d.lordo.toFixed(2)} (IVA incl.)</div>
                       <div className="text-amber-600">€{d.prov.toFixed(2)} prov.</div></div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Package size={12}/> Totale acquistato per anno
+                    </div>
+                    {clienteOpenTotaliAnnui(d.ordini).map(([annoP, prodotti]) => (
+                      <div key={annoP} className="bg-blue-50 rounded-lg p-2.5 mb-2 border border-blue-100">
+                        <div className="text-xs font-bold text-blue-800 mb-1.5">Anno {annoP}</div>
+                        {Object.entries(prodotti).sort((a,b)=>b[1]-a[1]).map(([prodotto, qta]) => (
+                          <div key={prodotto} className="flex justify-between text-xs py-1 border-b border-blue-100/50 last:border-0">
+                            <span className="text-gray-700 truncate pr-2">{prodotto}</span>
+                            <span className="font-bold text-blue-700 shrink-0">{qta} pz</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-gray-200">
