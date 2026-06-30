@@ -4,10 +4,17 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { Euro, Award, TrendingUp, Package, Users, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 
 const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
+const BRAND_COLORI = {
+  'Coco Cera':   'bg-blue-600 border-blue-600',
+  'Callus Stop': 'bg-emerald-600 border-emerald-600',
+  'Unica Wax':   'bg-violet-600 border-violet-600',
+}
 
 export default function Fatturato() {
   const [ordini, setOrdini] = useState([])
   const [anno, setAnno] = useState(new Date().getFullYear())
+  const [brandFiltro, setBrandFiltro] = useState('')
   const [clienteOpen, setClienteOpen] = useState(null)
   const [meseOpen, setMeseOpen] = useState(null)
 
@@ -23,20 +30,22 @@ export default function Fatturato() {
   const getMese = o => getTs(o)?.getMonth() ?? null
   const fmt = ts => { if(!ts) return ''; const d=ts.seconds?new Date(ts.seconds*1000):new Date(ts); return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'}) }
 
+  const ordiniBrand = brandFiltro ? ordini.filter(o => o.brand === brandFiltro) : ordini
+
   const oggi = new Date()
   const inizioOggi = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate())
   const inizioSettimana = new Date(inizioOggi)
   inizioSettimana.setDate(inizioOggi.getDate() - inizioOggi.getDay() + (inizioOggi.getDay() === 0 ? -6 : 1))
 
-  const ordiniOggi = ordini.filter(o => { const d = getTs(o); return d && d >= inizioOggi })
-  const ordiniSettimana = ordini.filter(o => { const d = getTs(o); return d && d >= inizioSettimana })
+  const ordiniOggi = ordiniBrand.filter(o => { const d = getTs(o); return d && d >= inizioOggi })
+  const ordiniSettimana = ordiniBrand.filter(o => { const d = getTs(o); return d && d >= inizioSettimana })
 
   const totOggi = ordiniOggi.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
   const totSettimana = ordiniSettimana.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
   const provOggi = ordiniOggi.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
   const provSettimana = ordiniSettimana.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
 
-  const ordiniAnno = ordini.filter(o=>getAnno(o)===anno)
+  const ordiniAnno = ordiniBrand.filter(o=>getAnno(o)===anno)
   const totNetto = ordiniAnno.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0)
   const totLordo = ordiniAnno.reduce((s,o)=>s+(o.totaleLordo||o.totale||0),0)
   const totProv  = ordiniAnno.reduce((s,o)=>s+(o.totaleProvvigione||0),0)
@@ -67,6 +76,32 @@ export default function Fatturato() {
   }))
   const topProd = Object.entries(perProd).sort((a,b)=>b[1].tot-a[1].tot).slice(0,5)
 
+  const clienteOpenStoricoProdotti = (clienteOrdini) => {
+    const perAnnoMese = {}
+    clienteOrdini.forEach(o => {
+      const a = getAnno(o)
+      const m = getMese(o)
+      if (a === null || m === null) return
+      const key = `${a}-${m}`
+      if (!perAnnoMese[key]) perAnnoMese[key] = { anno: a, mese: m, prodotti: {} }
+      ;(o.righe||[]).forEach(r => {
+        if (!perAnnoMese[key].prodotti[r.nome]) perAnnoMese[key].prodotti[r.nome] = 0
+        perAnnoMese[key].prodotti[r.nome] += r.qta
+      })
+    })
+    return Object.values(perAnnoMese).sort((a,b) => b.anno - a.anno || b.mese - a.mese)
+  }
+
+  const riepilogoBrand = BRAND.map(b => {
+    const ob = ordini.filter(o => o.brand === b && getAnno(o) === anno)
+    return {
+      brand: b,
+      netto: ob.reduce((s,o)=>s+(o.totaleNetto||o.totale||0),0),
+      prov: ob.reduce((s,o)=>s+(o.totaleProvvigione||0),0),
+      num: ob.length
+    }
+  })
+
   const anni = [...new Set(ordini.map(getAnno).filter(Boolean))].sort((a,b)=>b-a)
   if(!anni.includes(anno)) anni.unshift(anno)
 
@@ -82,7 +117,26 @@ export default function Fatturato() {
         </select>
       </div>
 
-      {/* OGGI E SETTIMANA */}
+      <div className="grid grid-cols-3 gap-2 mb-5">
+        {riepilogoBrand.map(({ brand, netto, prov, num }) => (
+          <button key={brand} onClick={() => setBrandFiltro(brandFiltro === brand ? '' : brand)}
+            className={`rounded-2xl p-3 text-center border-2 transition-all active:scale-95 ${
+              brandFiltro === brand ? `${BRAND_COLORI[brand]} text-white` : 'bg-white border-gray-200 text-gray-700'
+            }`}>
+            <div className="text-xs font-bold mb-1 truncate">{brand}</div>
+            <div className="text-lg font-bold">€{netto.toFixed(0)}</div>
+            <div className={`text-xs ${brandFiltro===brand ? 'text-white/80' : 'text-amber-600'}`}>€{prov.toFixed(0)} prov.</div>
+            <div className={`text-xs mt-0.5 ${brandFiltro===brand ? 'text-white/70' : 'text-gray-400'}`}>{num} ord.</div>
+          </button>
+        ))}
+      </div>
+
+      {brandFiltro && (
+        <button onClick={()=>setBrandFiltro('')} className="w-full mb-4 text-sm text-blue-600 font-semibold py-2">
+          ✕ Mostra tutti i brand
+        </button>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-center">
           <div className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">☀️ Oggi</div>
@@ -98,11 +152,10 @@ export default function Fatturato() {
         </div>
       </div>
 
-      {/* KPI ANNO */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="card text-center">
           <Euro size={20} className="text-gray-400 mx-auto mb-1"/>
-          <div className="text-xs text-gray-400 mb-0.5">Imponibile {anno}</div>
+          <div className="text-xs text-gray-400 mb-0.5">Imponibile {anno}{brandFiltro && ' · '+brandFiltro}</div>
           <div className="text-2xl font-bold text-gray-900">€{totNetto.toFixed(0)}</div>
         </div>
         <div className="card text-center">
@@ -112,17 +165,16 @@ export default function Fatturato() {
         </div>
         <div className="card text-center col-span-2 bg-amber-50 border-amber-200">
           <div className="flex items-center justify-center gap-1 mb-1"><Lock size={14} className="text-amber-500"/><Award size={20} className="text-amber-500"/></div>
-          <div className="text-xs text-amber-600 mb-0.5">Mia Provvigione {anno}</div>
+          <div className="text-xs text-amber-600 mb-0.5">Mia Provvigione {anno}{brandFiltro && ' · '+brandFiltro}</div>
           <div className="text-3xl font-bold text-amber-700">€{totProv.toFixed(2)}</div>
           <div className="text-xs text-amber-500 mt-1">{numOrd} ordini</div>
         </div>
       </div>
 
-      {/* PROVVIGIONI MESE PER MESE */}
       <div className="card mb-5">
         <div className="flex items-center gap-2 mb-4">
           <Lock size={14} className="text-amber-500"/>
-          <div className="text-sm font-bold text-gray-700">Provvigioni mese per mese</div>
+          <div className="text-sm font-bold text-gray-700">Provvigioni mese per mese {brandFiltro && '· '+brandFiltro}</div>
         </div>
         <div className="flex flex-col gap-1">
           {perMese.map((m,i) => (
@@ -144,7 +196,7 @@ export default function Fatturato() {
                 <div className="ml-11 mb-2 bg-amber-50 rounded-xl p-3">
                   {m.ordini.map(o=>(
                     <div key={o.id} className="flex justify-between text-sm py-1 border-b border-amber-100 last:border-0">
-                      <div><div className="font-semibold text-gray-800">{o.clienteNome}</div>
+                      <div><div className="font-semibold text-gray-800">{o.clienteNome} {o.brand && <span className="text-xs text-gray-400">({o.brand})</span>}</div>
                         <div className="text-xs text-gray-400">{fmt(o.creatoAl)}</div></div>
                       <div className="text-right">
                         <div className="font-bold text-gray-900">€{Number(o.totaleNetto||o.totale||0).toFixed(2)}</div>
@@ -163,12 +215,11 @@ export default function Fatturato() {
         </div>
       </div>
 
-      {/* FATTURATO PER CLIENTE */}
       {topClienti.length>0 && (
         <div className="card mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Users size={16} className="text-gray-500"/>
-            <div className="text-sm font-bold text-gray-700">Fatturato per Cliente {anno}</div>
+            <div className="text-sm font-bold text-gray-700">Fatturato per Cliente {anno}{brandFiltro && ' · '+brandFiltro}</div>
           </div>
           {topClienti.map(([nome,d],i) => (
             <div key={nome}>
@@ -196,7 +247,7 @@ export default function Fatturato() {
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Storico ordini</div>
                   {d.ordini.sort((a,b)=>(b.creatoAl?.seconds||0)-(a.creatoAl?.seconds||0)).map(o=>(
                     <div key={o.id} className="flex justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
-                      <div><div className="text-gray-700">{fmt(o.creatoAl)}</div>
+                      <div><div className="text-gray-700">{fmt(o.creatoAl)} {o.brand && <span className="text-xs text-gray-400">({o.brand})</span>}</div>
                         <div className="text-xs text-gray-400">{o.stato}</div></div>
                       <div className="text-right">
                         <div className="font-semibold">€{Number(o.totaleNetto||o.totale||0).toFixed(2)}</div>
@@ -210,6 +261,23 @@ export default function Fatturato() {
                     <div className="text-right"><div>€{d.lordo.toFixed(2)} (IVA incl.)</div>
                       <div className="text-amber-600">€{d.prov.toFixed(2)} prov.</div></div>
                   </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Package size={12}/> Consumi prodotti per mese
+                    </div>
+                    {clienteOpenStoricoProdotti(d.ordini).map((periodo, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-2.5 mb-2 border border-gray-100">
+                        <div className="text-xs font-bold text-blue-700 mb-1.5">{MESI[periodo.mese]} {periodo.anno}</div>
+                        {Object.entries(periodo.prodotti).sort((a,b)=>b[1]-a[1]).map(([prodotto, qta]) => (
+                          <div key={prodotto} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-gray-600 truncate pr-2">{prodotto}</span>
+                            <span className="font-bold text-gray-800 shrink-0">{qta} pz</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -217,12 +285,11 @@ export default function Fatturato() {
         </div>
       )}
 
-      {/* TOP PRODOTTI */}
       {topProd.length>0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-3">
             <Package size={16} className="text-gray-500"/>
-            <div className="text-sm font-bold text-gray-700">Top Prodotti {anno}</div>
+            <div className="text-sm font-bold text-gray-700">Top Prodotti {anno}{brandFiltro && ' · '+brandFiltro}</div>
           </div>
           {topProd.map(([nome,d],i)=>(
             <div key={nome} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
