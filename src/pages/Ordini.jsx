@@ -5,9 +5,9 @@ import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, 
 import OrdineModal from '../components/OrdineModal'
 
 const STATI = {
-  'Preventivo': { bg: 'bg-gray-100',  border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
-  'Inviato':    { bg: 'bg-blue-50',   border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'    },
-  'Spedito':    { bg: 'bg-purple-50', border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
+  'Preventivo': { bg: 'bg-gray-100',   border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
+  'Inviato':    { bg: 'bg-blue-50',    border: 'border-l-blue-500',   pill: 'bg-blue-100 text-blue-700'    },
+  'Spedito':    { bg: 'bg-purple-50',  border: 'border-l-purple-500', pill: 'bg-purple-100 text-purple-700' },
 }
 
 const EMAIL_AZIENDA = 'ordini@cococera.it'
@@ -24,7 +24,7 @@ export default function Ordini() {
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'ordini'), snap => {
       setOrdini(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.creatoAl?.seconds || 0) - (a.creatoAl?.seconds || 0)))
+        .sort((a, b) => (b.creatoAl?.seconds * 1000 || b.creatoAlClient || 0) - (a.creatoAl?.seconds * 1000 || a.creatoAlClient || 0)))
     })
     const u2 = onSnapshot(collection(db, 'clienti'), snap => {
       setClienti(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -45,7 +45,7 @@ export default function Ordini() {
     if (modal?.id) {
       await updateDoc(doc(db, 'ordini', modal.id), { ...form, aggiornatoAl: serverTimestamp() })
     } else {
-      await addDoc(collection(db, 'ordini'), { ...form, creatoAl: serverTimestamp() })
+      await addDoc(collection(db, 'ordini'), { ...form, creatoAl: serverTimestamp(), creatoAlClient: Date.now() })
     }
     setModal(null)
   }
@@ -137,7 +137,6 @@ export default function Ordini() {
             const cfg = STATI[o.stato] || STATI['Preventivo']
             return (
               <div key={o.id} className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${cfg.border} overflow-hidden`}>
-
                 <div className={`px-4 pt-4 pb-3 ${cfg.bg}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -180,8 +179,6 @@ export default function Ordini() {
 
                 {espanso === o.id && (
                   <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-100 pt-3">
-
-                    {/* TASTO INVIA ORDINE - solo per preventivi */}
                     {o.stato === 'Preventivo' && (
                       <button onClick={() => aggiornaStato(o.id, 'Inviato')}
                         className="w-full bg-green-500 text-white font-bold py-4 rounded-2xl text-base active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2">
