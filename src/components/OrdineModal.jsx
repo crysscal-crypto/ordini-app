@@ -7,10 +7,15 @@ const IVA = 0.22
 const EMAIL_AZIENDA = 'ordini@cococera.it'
 const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
 const STATI = ['Preventivo', 'In Pending', 'Spedito']
+const PAGAMENTI_OPZIONI = [
+  'Riba 30','Riba 30/60','Riba 30/60/90/120',
+  'RID 30','RID 30/60','RID 30/60/90','RID 30/60/90/120',
+  'Bonifico Anticipato','Contrassegno','Vedi Note'
+]
 
 const vuoto = {
   brand: 'Coco Cera',
-  clienteId:'', clienteNome:'', clienteEmail:'', clientePagamento:'', clienteGiornoChiusura:'',
+  clienteId:'', clienteNome:'', clienteEmail:'', clientePagamento:'', notePagamento:'', clienteGiornoChiusura:'',
   dataConsegna:'', indirizzoConsegna:'', note:'',
   righe:[], stato:'Preventivo', invioEmail:'entrambi'
 }
@@ -90,6 +95,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
 
     setInviando(true)
     try {
+      const pagamentoCompleto = [form.clientePagamento, form.notePagamento].filter(Boolean).join(' - ') || '-'
       for (const dest of destinatari) {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           to_email: dest,
@@ -97,7 +103,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
           logo_url: getLogoUrl(form.brand),
           cliente_nome: form.clienteNome,
           indirizzo: form.indirizzoConsegna || '-',
-          pagamento: form.clientePagamento || '-',
+          pagamento: pagamentoCompleto,
           data_consegna: form.dataConsegna || '-',
           righe_html: buildRigheHtml(form.righe),
           totale_netto: totNetto.toFixed(2),
@@ -166,7 +172,15 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
 
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Modalità Pagamento</label>
-            <input className="input-field" value={form.clientePagamento} onChange={e=>set('clientePagamento',e.target.value)} placeholder="Riba 30..."/>
+            <select className="input-field" value={form.clientePagamento} onChange={e=>set('clientePagamento',e.target.value)}>
+              <option value="">— Seleziona —</option>
+              {PAGAMENTI_OPZIONI.map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Note Pagamento {form.clientePagamento==='Vedi Note' && <span className="text-amber-600">*</span>}</label>
+            <input className={`input-field ${form.clientePagamento==='Vedi Note' ? 'border-amber-400 bg-amber-50' : ''}`} value={form.notePagamento} onChange={e=>set('notePagamento',e.target.value)} placeholder="Eventuali condizioni particolari..."/>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
