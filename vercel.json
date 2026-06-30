@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/((?!loghi/).*)", "destination": "/" }
+    { "source": "/((?!loghi|coco_5AS_icon.ico).*)", "destination": "/" }
   ]
 }
