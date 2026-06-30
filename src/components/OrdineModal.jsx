@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { X, Save, Plus, Minus, Trash2, ChevronDown, ChevronUp, Send, Search, Star } from 'lucide-react'
+import { X, Save, Plus, Minus, Trash2, ChevronDown, ChevronUp, Send, Search, Star, Loader2 } from 'lucide-react'
+import emailjs from '@emailjs/browser'
+import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml } from '../emailConfig'
 
 const IVA = 0.22
 const EMAIL_AZIENDA = 'ordini@cococera.it'
@@ -18,6 +20,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
   const [cerca, setCerca] = useState('')
   const [showProd, setShowProd] = useState(false)
   const [catFiltro, setCatFiltro] = useState('')
+  const [inviando, setInviando] = useState(false)
 
   useEffect(() => { setForm(ordine ? { ...vuoto, ...ordine } : { ...vuoto, righe:[] }) }, [ordine])
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
@@ -76,14 +79,39 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
     onSave({ ...form, totaleNetto:totNetto, totaleIVA:totIVA, totaleLordo:totLordo, totaleProvvigione:totProv })
   }
 
-  const inviaEmail = () => {
+  const inviaEmail = async () => {
     const c = clienti.find(x=>x.id===form.clienteId)
     const emailC = c?.email||form.clienteEmail
     if (form.invioEmail!=='azienda' && !emailC) return alert('Aggiungi l\'email al cliente')
-    const righeT = form.righe.map(r=>`  ${r.codice||'-'}  ${r.nome}  x${r.qta}  €${r.prezzoUnitario.toFixed(2)}  =€${(r.qta*r.prezzoUnitario).toFixed(2)}`).join('\n')
-    const body = `AGENTE: CALIUMI CRISTIAN\nBrand: ${form.brand}\n\nCliente: ${form.clienteNome}\n${form.indirizzoConsegna?'Indirizzo: '+form.indirizzoConsegna+'\n':''}${form.dataConsegna?'Data consegna: '+form.dataConsegna+'\n':''}Pagamento: ${form.clientePagamento}\n\n--- PRODOTTI ---\n${righeT}\n\nImponibile: €${totNetto.toFixed(2)}\nIVA 22%:    €${totIVA.toFixed(2)}\nTOTALE:     €${totLordo.toFixed(2)}\n\n${form.note?'Note: '+form.note:''}\n\nCordiali saluti\nAgente Caliumi Cristian\nordini@cococera.it`
-    const dest = [form.invioEmail!=='azienda'?emailC:null, form.invioEmail!=='cliente'?EMAIL_AZIENDA:null].filter(Boolean)
-    window.location.href = `mailto:${dest.join(',')}?subject=${encodeURIComponent('Ordine '+form.brand+' - '+form.clienteNome)}&body=${encodeURIComponent(body)}`
+
+    const destinatari = []
+    if (form.invioEmail === 'cliente' || form.invioEmail === 'entrambi') destinatari.push(emailC)
+    if (form.invioEmail === 'azienda' || form.invioEmail === 'entrambi') destinatari.push(EMAIL_AZIENDA)
+
+    setInviando(true)
+    try {
+      for (const dest of destinatari) {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          to_email: dest,
+          brand: form.brand,
+          logo_url: getLogoUrl(form.brand),
+          cliente_nome: form.clienteNome,
+          indirizzo: form.indirizzoConsegna || '-',
+          pagamento: form.clientePagamento || '-',
+          data_consegna: form.dataConsegna || '-',
+          righe_html: buildRigheHtml(form.righe),
+          totale_netto: totNetto.toFixed(2),
+          totale_iva: totIVA.toFixed(2),
+          totale_lordo: totLordo.toFixed(2),
+          note: form.note || 'Nessuna nota',
+        }, EMAILJS_PUBLIC_KEY)
+      }
+      alert('✅ Email inviata con successo!')
+    } catch (err) {
+      alert('❌ Errore invio email: ' + (err.text || err.message || 'Errore sconosciuto'))
+    } finally {
+      setInviando(false)
+    }
   }
 
   const clienteSel = clienti.find(c=>c.id===form.clienteId)
@@ -97,7 +125,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
         </div>
         <div className="p-5 flex flex-col gap-5">
 
-          {/* BRAND */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">Brand *</label>
             <select className="input-field text-base font-semibold" value={form.brand} onChange={e=>set('brand',e.target.value)}>
@@ -105,7 +132,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             </select>
           </div>
 
-          {/* CLIENTE */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">Cliente *</label>
             <select className="input-field" value={form.clienteId}
@@ -128,19 +154,16 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             )}
           </div>
 
-          {/* INDIRIZZO */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Indirizzo Consegna</label>
             <input className="input-field" value={form.indirizzoConsegna} onChange={e=>set('indirizzoConsegna',e.target.value)} placeholder="Via, numero, città..."/>
           </div>
 
-          {/* PAGAMENTO */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Modalità Pagamento</label>
             <input className="input-field" value={form.clientePagamento} onChange={e=>set('clientePagamento',e.target.value)} placeholder="Riba 30..."/>
           </div>
 
-          {/* DATA + STATO */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1">Data Consegna</label>
@@ -154,7 +177,6 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             </div>
           </div>
 
-          {/* PRODOTTI */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-2">Prodotti * ({form.brand})</label>
             <button onClick={()=>setShowProd(v=>!v)} className="btn-primary w-full mb-3">
@@ -239,13 +261,11 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             )}
           </div>
 
-          {/* NOTE */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Note Ordine</label>
             <textarea className="input-field resize-none min-h-[70px]" value={form.note} onChange={e=>set('note',e.target.value)} placeholder="Istruzioni consegna, orari, riferimenti..."/>
           </div>
 
-          {/* EMAIL */}
           <div className="border-t pt-4">
             <div className="section-label">Invia conferma a:</div>
             <div className="grid grid-cols-3 gap-2 mb-3">
@@ -262,11 +282,13 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             </div>
           </div>
 
-          {/* BOTTONI */}
           <div className="flex flex-col gap-2 mt-2">
             <button onClick={handleSave} className="btn-success"><Save size={20}/> Salva Ordine</button>
             {form.righe.length>0 && form.clienteId && (
-              <button onClick={inviaEmail} className="btn-primary"><Send size={18}/> Invia Email Conferma</button>
+              <button onClick={inviaEmail} disabled={inviando} className="btn-primary">
+                {inviando ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
+                {inviando ? 'Invio in corso...' : 'Invia Email Conferma'}
+              </button>
             )}
           </div>
         </div>
