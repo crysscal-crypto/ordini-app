@@ -80,8 +80,24 @@ export default function Ordini() {
 
   const contaPerStato = (s) => ordini.filter(o => o.stato === s).length
 
+  const backupOggi = (() => {
+    const saved = localStorage.getItem('ultimoBackup')
+    if (!saved) return false
+    return new Date(saved).toDateString() === new Date().toDateString()
+  })()
+
   return (
     <div className="max-w-xl mx-auto px-4 pt-5">
+
+      {!backupOggi && (
+        <a href="/backup" className="block mb-4 bg-red-50 border-2 border-red-300 rounded-2xl p-3 active:scale-95 transition-all" style={{display:'flex', alignItems:'center', gap:'12px', textDecoration:'none'}}>
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <div className="font-bold text-red-700 text-sm">Backup non effettuato oggi</div>
+            <div className="text-xs text-red-500">Tocca qui per scaricare il backup →</div>
+          </div>
+        </a>
+      )}
 
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -188,7 +204,6 @@ export default function Ordini() {
                         <Send size={20}/> 📤 Conferma Ordine
                       </button>
                     )}
-
                     {o.righe?.length > 0 && (
                       <div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
@@ -207,7 +222,6 @@ export default function Ordini() {
                         </div>
                       </div>
                     )}
-
                     {o.indirizzoConsegna && (
                       <div className="flex gap-2 items-start text-sm bg-gray-50 rounded-xl p-3">
                         <MapPin size={15} className="text-gray-400 mt-0.5 shrink-0" />
@@ -220,7 +234,6 @@ export default function Ordini() {
                         <span className="text-gray-700">{o.note}</span>
                       </div>
                     )}
-
                     <div className="grid grid-cols-3 gap-2 mt-1">
                       <button onClick={() => setModal(o)}
                         className="bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm active:scale-95 flex flex-col items-center gap-1">
