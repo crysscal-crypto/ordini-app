@@ -6,6 +6,7 @@ import Clienti from './pages/Clienti'
 import Prodotti from './pages/Prodotti'
 import Ordini from './pages/Ordini'
 import Fatturato from './pages/Fatturato'
+import Backup from './pages/Backup'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/prodotti"  element={<Prodotti />} />
         <Route path="/ordini"    element={<Ordini />} />
         <Route path="/fatturato" element={<Fatturato />} />
+        <Route path="/backup"    element={<Backup />} />
       </Routes>
       <NavBar />
     </div>
