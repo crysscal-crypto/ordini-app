@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { LogOut } from 'lucide-react'
 
-const GIORNI = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato']
-const MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
-
-export default function TopBar() {
+export default function TopBar({ onLogout }) {
   const [ora, setOra] = useState(new Date())
 
   useEffect(() => {
@@ -11,21 +9,30 @@ export default function TopBar() {
     return () => clearInterval(t)
   }, [])
 
-  const giorno = GIORNI[ora.getDay()]
-  const data = `${ora.getDate()} ${MESI[ora.getMonth()]} ${ora.getFullYear()}`
-  const orario = ora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+  const giorni = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato']
+  const mesi = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
 
   return (
-    <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white px-4 pt-10 pb-4 shadow-md">
-      <div className="max-w-xl mx-auto flex items-center justify-between">
+    <div className="bg-blue-600 text-white px-5 pt-5 pb-4 mb-2">
+      <div className="flex items-start justify-between max-w-xl mx-auto">
         <div>
-          <div className="text-xs font-semibold opacity-75 uppercase tracking-widest">Benvenuto</div>
+          <div className="text-xs font-semibold text-blue-200 uppercase tracking-widest mb-0.5">BENVENUTO</div>
           <div className="text-2xl font-bold leading-tight">Ciao, Cristian 👋</div>
-          <div className="text-sm opacity-80 mt-0.5">{giorno}, {data}</div>
+          <div className="text-sm text-blue-200 mt-0.5">
+            {giorni[ora.getDay()]}, {ora.getDate()} {mesi[ora.getMonth()]} {ora.getFullYear()}
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-4xl font-bold tabular-nums tracking-tight">{orario}</div>
-          <div className="text-xs opacity-70 mt-0.5">ora locale</div>
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-3xl font-bold tabular-nums">
+            {String(ora.getHours()).padStart(2,'0')}:{String(ora.getMinutes()).padStart(2,'0')}
+          </div>
+          <div className="text-xs text-blue-200">ora locale</div>
+          {onLogout && (
+            <button onClick={onLogout}
+              className="flex items-center gap-1 text-xs text-blue-200 hover:text-white bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-xl transition-all active:scale-95">
+              <LogOut size={13}/> Esci
+            </button>
+          )}
         </div>
       </div>
     </div>
