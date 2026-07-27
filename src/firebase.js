@@ -3,7 +3,7 @@ import { getFirestore } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB3wjavGLZlgwt9Z91tqu-s8tI7AAezsbI",
+  apiKey: "AIzaSyB3wjavGlZlgwt9Z91tqu-s8tI7AAezsbI",
   authDomain: "ordini-coco-cera-e-calus-stop.firebaseapp.com",
   projectId: "ordini-coco-cera-e-calus-stop",
   storageBucket: "ordini-coco-cera-e-calus-stop.firebasestorage.app",
