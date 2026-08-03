@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Save, Plus, Minus, Trash2, ChevronDown, ChevronUp, Send, Search, Star, Loader2 } from 'lucide-react'
 import emailjs from '@emailjs/browser'
-import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml } from '../emailConfig'
+import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml, buildDatiClienteHtml } from '../emailConfig'
 
 const IVA = 0.22
 const EMAIL_AZIENDA = 'ordini@cococera.it'
@@ -16,7 +16,7 @@ const PAGAMENTI_OPZIONI = [
 const vuoto = {
   brand: 'Coco Cera',
   clienteId:'', clienteNome:'', clienteEmail:'', clientePagamento:'', notePagamento:'', clienteGiornoChiusura:'',
-  dataConsegna:'', indirizzoConsegna:'', note:'',
+  dataConsegna:'', indirizzoConsegna:'', note:'', clienteNuovo: false,
   righe:[], stato:'Preventivo', invioEmail:'entrambi'
 }
 
@@ -61,11 +61,10 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
   const categorie = [...new Set(prodotti.filter(p=>(p.brand||'Coco Cera')===form.brand).map(p=>p.categoria).filter(Boolean))]
 
   const addProdotto = (p) => {
-    setForm(f => {
-      const idx = f.righe.findIndex(r=>r.prodottoId===p.id)
-      if (idx>=0) return f
-      return { ...f, righe:[...f.righe,{ prodottoId:p.id, codice:p.codice||'', nome:p.nome, formato:p.formato||'', prezzoUnitario:p.prezzo, provvigione:p.provvigione||0, qta:1 }]}
-    })
+    setForm(f => ({
+      ...f,
+      righe: [...f.righe, { prodottoId:p.id, codice:p.codice||'', nome:p.nome, formato:p.formato||'', prezzoUnitario:p.prezzo, provvigione:p.provvigione||0, qta:1, omaggio:false }]
+    }))
   }
 
   const updRiga = (idx,k,v) => setForm(f => {
@@ -73,10 +72,10 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
   })
   const delRiga = (idx) => setForm(f=>({...f,righe:f.righe.filter((_,i)=>i!==idx)}))
 
-  const totNetto = form.righe.reduce((s,r)=>s+(r.qta*r.prezzoUnitario),0)
+  const totNetto = form.righe.reduce((s,r)=>s+(r.omaggio?0:r.qta*r.prezzoUnitario),0)
   const totIVA   = totNetto*IVA
   const totLordo = totNetto+totIVA
-  const totProv  = form.righe.reduce((s,r)=>s+(r.qta*r.prezzoUnitario*(r.provvigione/100)),0)
+  const totProv  = form.righe.reduce((s,r)=>s+(r.omaggio?0:r.qta*r.prezzoUnitario*(r.provvigione/100)),0)
 
   const handleSave = () => {
     if (!form.clienteId) return alert('Seleziona un cliente')
@@ -96,20 +95,27 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
     setInviando(true)
     try {
       const pagamentoCompleto = [form.clientePagamento, form.notePagamento].filter(Boolean).join(' - ') || '-'
+      const giornoChiusura = form.clienteGiornoChiusura && form.clienteGiornoChiusura !== '—'
+        ? `⚠️ ATTENZIONE: Cliente chiuso il ${form.clienteGiornoChiusura}`
+        : ''
+      const datiClienteHtml = form.clienteNuovo ? buildDatiClienteHtml(c) : ''
+
       for (const dest of destinatari) {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           to_email: dest,
           brand: form.brand,
           logo_url: getLogoUrl(form.brand),
-          cliente_nome: form.clienteNome,
+          cliente_nome: form.clienteNome + (form.clienteNuovo ? ' 🆕' : ''),
           indirizzo: form.indirizzoConsegna || '-',
           pagamento: pagamentoCompleto,
           data_consegna: form.dataConsegna || '-',
+          giorno_chiusura: giornoChiusura,
+          dati_cliente_html: datiClienteHtml,
           righe_html: buildRigheHtml(form.righe),
           totale_netto: totNetto.toFixed(2),
           totale_iva: totIVA.toFixed(2),
           totale_lordo: totLordo.toFixed(2),
-          note: form.note || 'Nessuna nota',
+          note: form.note || '',
         }, EMAILJS_PUBLIC_KEY)
       }
 
@@ -164,6 +170,17 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
               </div>
             )}
           </div>
+
+          {/* FLAG CLIENTE NUOVO */}
+          {form.clienteId && (
+            <label className="flex items-center gap-3 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 cursor-pointer active:scale-95 transition-all">
+              <input type="checkbox" checked={form.clienteNuovo} onChange={e=>set('clienteNuovo',e.target.checked)} className="w-5 h-5 accent-amber-500"/>
+              <div>
+                <div className="font-bold text-amber-800 text-sm">🆕 Cliente Nuovo</div>
+                <div className="text-xs text-amber-600">Invia anche P.IVA, SDI, PEC, indirizzo e IBAN all'azienda</div>
+              </div>
+            </label>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">Indirizzo Consegna</label>
@@ -227,15 +244,7 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
                             <div className="text-xs text-gray-400">{p.codice} · {p.formato}</div>
                           </div>
                           <div className="font-bold text-blue-700 text-sm shrink-0">€{Number(p.prezzo).toFixed(2)}</div>
-                          {inOrdine ? (
-                            <div className="flex items-center bg-white border border-gray-200 rounded-lg shrink-0">
-                              <button onClick={()=>updRiga(form.righe.indexOf(inOrdine),'qta',Math.max(1,inOrdine.qta-1))} className="p-1.5 text-gray-500"><Minus size={14}/></button>
-                              <input type="number" min="1" className="w-10 text-center font-bold text-sm border-none outline-none" value={inOrdine.qta} onChange={e=>updRiga(form.righe.indexOf(inOrdine),'qta',e.target.value)}/>
-                              <button onClick={()=>updRiga(form.righe.indexOf(inOrdine),'qta',inOrdine.qta+1)} className="p-1.5 text-gray-500"><Plus size={14}/></button>
-                            </div>
-                          ) : (
-                            <button onClick={()=>addProdotto(p)} className="bg-blue-600 text-white rounded-lg p-2 active:scale-95 shrink-0"><Plus size={16}/></button>
-                          )}
+                          <button onClick={()=>addProdotto(p)} className="bg-blue-600 text-white rounded-lg p-2 active:scale-95 shrink-0"><Plus size={16}/></button>
                         </div>
                       )
                     })
@@ -247,13 +256,22 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
             {form.righe.length>0 && (
               <div className="flex flex-col gap-2">
                 {form.righe.map((r,i)=>(
-                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div key={i} className={`border rounded-xl p-3 ${r.omaggio ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="font-semibold text-gray-800 text-sm">{r.nome}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-800 text-sm">{r.nome}</span>
+                          {r.omaggio && <span className="text-xs font-bold bg-green-500 text-white px-2 py-0.5 rounded-full">🎁 OMAGGIO</span>}
+                        </div>
                         <div className="text-xs text-gray-400">{r.codice}{r.formato?' · '+r.formato:''}</div>
                       </div>
-                      <button onClick={()=>delRiga(i)} className="p-1 text-red-400"><Trash2 size={18}/></button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={()=>updRiga(i,'omaggio',!r.omaggio)}
+                          className={`text-xs font-bold px-2 py-1 rounded-lg border transition-all active:scale-95 ${r.omaggio ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-400 border-gray-200'}`}>
+                          🎁
+                        </button>
+                        <button onClick={()=>delRiga(i)} className="p-1 text-red-400"><Trash2 size={18}/></button>
+                      </div>
                     </div>
                     <div className="flex gap-2 items-center">
                       <div className="flex items-center bg-white border border-gray-200 rounded-lg">
@@ -261,12 +279,16 @@ export default function OrdineModal({ ordine, clienti, prodotti, onSave, onClose
                         <input type="number" min="1" className="w-14 text-center font-bold text-base border-none outline-none" value={r.qta} onChange={e=>updRiga(i,'qta',e.target.value)}/>
                         <button onClick={()=>updRiga(i,'qta',r.qta+1)} className="p-2 text-gray-500"><Plus size={16}/></button>
                       </div>
-                      <div className="flex-1 flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+                      <div className={`flex-1 flex items-center gap-1 border rounded-lg px-2 py-1.5 ${r.omaggio ? 'bg-green-100 border-green-300' : 'bg-white border-gray-200'}`}>
                         <span className="text-xs text-gray-400">€</span>
-                        <input type="number" min="0" step="0.01" className="w-full text-sm font-bold text-right outline-none" value={r.prezzoUnitario} onChange={e=>updRiga(i,'prezzoUnitario',e.target.value)}/>
+                        <input type="number" min="0" step="0.01" className="w-full text-sm font-bold text-right outline-none bg-transparent"
+                          value={r.omaggio ? 0 : r.prezzoUnitario} disabled={r.omaggio}
+                          onChange={e=>updRiga(i,'prezzoUnitario',e.target.value)}/>
                       </div>
                       <div className="text-right min-w-[68px]">
-                        <div className="font-bold text-gray-900">€{(r.qta*r.prezzoUnitario).toFixed(2)}</div>
+                        <div className={`font-bold ${r.omaggio ? 'text-green-600' : 'text-gray-900'}`}>
+                          {r.omaggio ? 'OMAGGIO' : `€${(r.qta*r.prezzoUnitario).toFixed(2)}`}
+                        </div>
                       </div>
                     </div>
                   </div>

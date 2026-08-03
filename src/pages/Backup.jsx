@@ -89,7 +89,7 @@ export default function Backup() {
       const wsRiepilogo = XLSX.utils.json_to_sheet(riepilogoData)
       XLSX.utils.book_append_sheet(wb, wsRiepilogo, 'Riepilogo')
 
-      const nomeFile = `Backup_${oggi.getFullYear()}-${String(oggi.getMonth()+1).padStart(2,'0')}-${String(oggi.getDate()).padStart(2,'0')}.xlsx`
+      const nomeFile = `Backup CocoCera ${String(oggi.getDate()).padStart(2,'0')}-${String(oggi.getMonth()+1).padStart(2,'0')}-${oggi.getFullYear()}.xlsx`
       XLSX.writeFile(wb, nomeFile)
 
       localStorage.setItem('ultimoBackup', oggi.toISOString())
