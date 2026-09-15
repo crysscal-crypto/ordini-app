@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { X, Save } from 'lucide-react'
+import { X, Save, Plus, Trash2 } from 'lucide-react'
 
 const CATEGORIE = ['Prodotti Cabina','Prodotti Domiciliari','Kit Iniziali','Promo Riordino','Merchandising','Promozioni','Altro']
 const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
 const FORMATI = ['pz','kg','g','ml','l','cf','kit','box','flacone','tubetto','bustina','altro']
-const vuoto = { codice:'', nome:'', categoria:'Prodotti Cabina', formato:'', prezzo:'', provvigione:'', unita:'pz', brand:'Coco Cera' }
+const BRAND_CON_COMPOSIZIONE = ['Coco Cera', 'Unica Wax']
 
-// ⚠️ Field FUORI dalla funzione — fix bug focus
+const vuoto = { codice:'', nome:'', categoria:'Prodotti Cabina', formato:'', prezzo:'', provvigione:'', unita:'pz', brand:'Coco Cera', composizione:[] }
+
 const Field = ({label, children}) => (
   <div><label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>{children}</div>
 )
@@ -15,7 +16,7 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
   const [form, setForm] = useState(vuoto)
 
   useEffect(() => {
-    setForm(prodotto ? { ...vuoto, ...prodotto } : { ...vuoto, brand: brand || 'Coco Cera' })
+    setForm(prodotto ? { ...vuoto, composizione:[], ...prodotto } : { ...vuoto, brand: brand || 'Coco Cera' })
   }, [prodotto, brand])
 
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
@@ -26,6 +27,24 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
       const prov = cat === 'Prodotti Cabina' ? '20' : cat === 'Merchandising' ? '0' : '15'
       set('provvigione', prov)
     }
+  }
+
+  const mostraComposizione = form.categoria === 'Promozioni' && BRAND_CON_COMPOSIZIONE.includes(form.brand)
+
+  const addRigaComposizione = () => {
+    setForm(f => ({ ...f, composizione: [...(f.composizione||[]), { prodotto:'', qta:1 }] }))
+  }
+
+  const updComposizione = (i, k, v) => {
+    setForm(f => {
+      const c = [...(f.composizione||[])]
+      c[i] = { ...c[i], [k]: k==='qta' ? parseInt(v)||1 : v }
+      return { ...f, composizione: c }
+    })
+  }
+
+  const delComposizione = (i) => {
+    setForm(f => ({ ...f, composizione: f.composizione.filter((_,idx)=>idx!==i) }))
   }
 
   const handleSave = () => {
@@ -73,6 +92,57 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
               {CATEGORIE.map(c=><option key={c}>{c}</option>)}
             </select>
           </Field>
+
+          {/* COMPOSIZIONE PROMO - solo Coco Cera e Unica Wax */}
+          {mostraComposizione && (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="font-bold text-blue-800 text-sm">📦 Composizione Promo</div>
+                  <div className="text-xs text-blue-600 mt-0.5">Indica i prodotti inclusi (es. sacchetti di cera, accessori)</div>
+                </div>
+                <button onClick={addRigaComposizione}
+                  className="bg-blue-600 text-white rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1 active:scale-95">
+                  <Plus size={14}/> Aggiungi
+                </button>
+              </div>
+
+              {(form.composizione||[]).length === 0 && (
+                <div className="text-center text-blue-400 text-xs py-3">
+                  Nessun componente — clicca Aggiungi
+                </div>
+              )}
+
+              {(form.composizione||[]).map((c,i) => (
+                <div key={i} className="flex gap-2 items-center mb-2">
+                  <input
+                    className="input-field flex-1 text-sm py-2"
+                    value={c.prodotto}
+                    onChange={e=>updComposizione(i,'prodotto',e.target.value)}
+                    placeholder="Nome prodotto (es. Unica wax 1kg)"
+                  />
+                  <div className="flex items-center bg-white border border-gray-200 rounded-xl shrink-0">
+                    <button onClick={()=>updComposizione(i,'qta',Math.max(1,c.qta-1))} className="px-2 py-2 text-gray-500 text-sm font-bold">−</button>
+                    <input type="number" min="1"
+                      className="w-10 text-center font-bold text-sm border-none outline-none"
+                      value={c.qta}
+                      onChange={e=>updComposizione(i,'qta',e.target.value)}
+                    />
+                    <button onClick={()=>updComposizione(i,'qta',c.qta+1)} className="px-2 py-2 text-gray-500 text-sm font-bold">+</button>
+                  </div>
+                  <button onClick={()=>delComposizione(i)} className="p-2 text-red-400 active:scale-95">
+                    <Trash2 size={16}/>
+                  </button>
+                </div>
+              ))}
+
+              {(form.composizione||[]).length > 0 && (
+                <div className="mt-2 bg-blue-100 rounded-lg p-2 text-xs text-blue-700">
+                  Totale componenti: {form.composizione.reduce((s,c)=>s+c.qta,0)} pz
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Prezzo (€) *">
