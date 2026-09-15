@@ -9,7 +9,7 @@ const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
 const CAT_COLORS = {
   'Prodotti Cabina':'bg-blue-100 text-blue-700','Prodotti Domiciliari':'bg-green-100 text-green-700',
   'Kit Iniziali':'bg-yellow-100 text-yellow-700','Promo Riordino':'bg-orange-100 text-orange-700',
-  'Merchandising':'bg-purple-100 text-purple-700','Promozioni 2025':'bg-red-100 text-red-700',
+  'Merchandising':'bg-purple-100 text-purple-700','Promozioni':'bg-red-100 text-red-700',
 }
 
 export default function Prodotti() {
