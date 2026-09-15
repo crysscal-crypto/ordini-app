@@ -6,6 +6,7 @@ import ProdottoModal from '../components/ProdottoModal'
 import * as XLSX from 'xlsx'
 
 const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
+const MIGRA_CATEGORIE = { 'Promozioni 2025': 'Promozioni' }
 const CAT_COLORS = {
   'Prodotti Cabina':'bg-blue-100 text-blue-700','Prodotti Domiciliari':'bg-green-100 text-green-700',
   'Kit Iniziali':'bg-yellow-100 text-yellow-700','Promo Riordino':'bg-orange-100 text-orange-700',
@@ -80,6 +81,16 @@ export default function Prodotti() {
     setNuovaProvv('')
   }
 
+  const migraCategorie = async () => {
+    const damigrare = prodotti.filter(p => MIGRA_CATEGORIE[p.categoria])
+    if (!damigrare.length) return alert('Nessun prodotto da migrare!')
+    if (!confirm(`Aggiornare ${damigrare.length} prodotti?`)) return
+    const batch = writeBatch(db)
+    damigrare.forEach(p => batch.update(doc(db,'prodotti',p.id), { categoria: MIGRA_CATEGORIE[p.categoria] }))
+    await batch.commit()
+    alert('✅ Categorie aggiornate!')
+  }
+
   const importaExcel = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setImportando(true)
@@ -118,6 +129,8 @@ export default function Prodotti() {
     finally { setImportando(false); e.target.value='' }
   }
 
+  const haDaMigrare = prodotti.some(p => MIGRA_CATEGORIE[p.categoria])
+
   return (
     <div className="max-w-xl mx-auto px-4 pt-5">
       <div className="flex items-center justify-between mb-4">
@@ -126,6 +139,11 @@ export default function Prodotti() {
           <p className="text-sm text-gray-400">{prodottiBrand.length} prodotti · {brandFiltro}</p>
         </div>
         <div className="flex gap-2">
+          {haDaMigrare && (
+            <button onClick={migraCategorie} className="btn-warning text-xs px-3">
+              🔄 Migra
+            </button>
+          )}
           <button onClick={()=>fileRef.current.click()} className="btn-warning" disabled={importando}>
             <Upload size={18}/> {importando?'...':'Excel'}
           </button>
@@ -134,7 +152,6 @@ export default function Prodotti() {
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importaExcel}/>
       </div>
 
-      {/* BRAND TABS */}
       <div className="flex gap-2 mb-3">
         {BRAND.map(b => (
           <button key={b} onClick={()=>{ setBrandFiltro(b); setCatFiltro(''); setSelezionati([]) }}
@@ -145,7 +162,6 @@ export default function Prodotti() {
         ))}
       </div>
 
-      {/* SELEZIONE MULTIPLA */}
       {selezionati.length > 0 && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 mb-3 flex items-center gap-2">
           <span className="text-sm font-semibold text-amber-800">{selezionati.length} selezionati</span>
