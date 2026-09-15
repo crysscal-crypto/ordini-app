@@ -48,8 +48,9 @@ export default function Prodotti() {
   const categorie = [...new Set(prodotti.filter(p=>(p.brand||'Coco Cera')===brandFiltro).map(p=>p.categoria).filter(Boolean))]
 
   const salva = async (form) => {
-    if (modal?.id) await updateDoc(doc(db,'prodotti',modal.id),{...form, aggiornatoAl:serverTimestamp()})
-    else await addDoc(collection(db,'prodotti'),{...form, brand: brandFiltro, creatoAl:serverTimestamp()})
+    const { id, ...dati } = form
+    if (modal?.id) await updateDoc(doc(db,'prodotti',modal.id),{...dati, aggiornatoAl:serverTimestamp()})
+    else await addDoc(collection(db,'prodotti'),{...dati, brand: dati.brand || brandFiltro, creatoAl:serverTimestamp()})
     setModal(null)
   }
 
@@ -216,6 +217,11 @@ export default function Prodotti() {
                     {p.categoria && <span className={`badge ${CAT_COLORS[p.categoria]||'bg-gray-100 text-gray-600'}`}><Tag size={10} className="inline mr-1"/>{p.categoria}</span>}
                     {p.formato && <span className="badge bg-gray-100 text-gray-500">{p.formato}</span>}
                   </div>
+                  {p.categoria === 'Promozioni' && (p.composizione||[]).length > 0 && (
+                    <div className="ml-7 mb-2 text-xs text-blue-700">
+                      📦 {p.composizione.map(c => `${c.qta}× ${c.prodotto}${c.prodottoId ? '' : ' ⚠️'}`).join(' · ')}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 ml-7">
                     <span className="text-xl font-bold text-blue-700">€{Number(p.prezzo).toFixed(2)}</span>
                     {editProvv?.id===p.id ? (
@@ -244,7 +250,7 @@ export default function Prodotti() {
           ))}
         </div>
       )}
-      {modal && <ProdottoModal prodotto={modal==='nuovo'?null:modal} brand={brandFiltro} onSave={salva} onClose={()=>setModal(null)}/>}
+      {modal && <ProdottoModal prodotto={modal==='nuovo'?null:modal} brand={brandFiltro} prodotti={prodotti} onSave={salva} onClose={()=>setModal(null)}/>}
     </div>
   )
 }

@@ -12,7 +12,7 @@ const Field = ({label, children}) => (
   <div><label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>{children}</div>
 )
 
-export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
+export default function ProdottoModal({ prodotto, brand, prodotti = [], onSave, onClose }) {
   const [form, setForm] = useState(vuoto)
 
   useEffect(() => {
@@ -31,14 +31,32 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
 
   const mostraComposizione = form.categoria === 'Promozioni' && BRAND_CON_COMPOSIZIONE.includes(form.brand)
 
+  // Listino selezionabile: stesso brand, escluse le promozioni e il prodotto stesso
+  const listino = prodotti
+    .filter(p => (p.brand || 'Coco Cera') === form.brand)
+    .filter(p => p.categoria !== 'Promozioni')
+    .filter(p => !prodotto || p.id !== prodotto.id)
+    .sort((a, b) => (a.categoria || '').localeCompare(b.categoria || '') || (a.nome || '').localeCompare(b.nome || ''))
+
+  const categorieListino = [...new Set(listino.map(p => p.categoria || 'Altro'))]
+
   const addRigaComposizione = () => {
-    setForm(f => ({ ...f, composizione: [...(f.composizione||[]), { prodotto:'', qta:1 }] }))
+    setForm(f => ({ ...f, composizione: [...(f.composizione||[]), { prodottoId:'', prodotto:'', codice:'', qta:1 }] }))
   }
 
-  const updComposizione = (i, k, v) => {
+  const selezionaProdotto = (i, id) => {
+    const p = listino.find(x => x.id === id)
     setForm(f => {
       const c = [...(f.composizione||[])]
-      c[i] = { ...c[i], [k]: k==='qta' ? parseInt(v)||1 : v }
+      c[i] = { ...c[i], prodottoId: id, prodotto: p ? p.nome : '', codice: p ? (p.codice || '') : '' }
+      return { ...f, composizione: c }
+    })
+  }
+
+  const updQta = (i, v) => {
+    setForm(f => {
+      const c = [...(f.composizione||[])]
+      c[i] = { ...c[i], qta: Math.max(1, parseInt(v) || 1) }
       return { ...f, composizione: c }
     })
   }
@@ -50,6 +68,9 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
   const handleSave = () => {
     if (!form.nome.trim()) return alert('Inserisci il nome prodotto')
     if (form.prezzo === '' || form.prezzo === undefined) return alert('Inserisci il prezzo')
+    if (mostraComposizione && (form.composizione||[]).some(c => !c.prodottoId)) {
+      return alert('Seleziona dal listino tutti i componenti della promo (righe con ⚠️)')
+    }
     onSave({ ...form, prezzo: parseFloat(form.prezzo)||0, provvigione: parseFloat(form.provvigione)||0 })
   }
 
@@ -93,13 +114,13 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
             </select>
           </Field>
 
-          {/* COMPOSIZIONE PROMO - solo Coco Cera e Unica Wax */}
+          {/* COMPOSIZIONE PROMO - dal listino, solo Coco Cera e Unica Wax */}
           {mostraComposizione && (
             <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="font-bold text-blue-800 text-sm">📦 Composizione Promo</div>
-                  <div className="text-xs text-blue-600 mt-0.5">Indica i prodotti inclusi (es. sacchetti di cera, accessori)</div>
+                  <div className="text-xs text-blue-600 mt-0.5">Scegli i prodotti inclusi dal listino {form.brand}</div>
                 </div>
                 <button onClick={addRigaComposizione}
                   className="bg-blue-600 text-white rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1 active:scale-95">
@@ -114,31 +135,50 @@ export default function ProdottoModal({ prodotto, brand, onSave, onClose }) {
               )}
 
               {(form.composizione||[]).map((c,i) => (
-                <div key={i} className="flex gap-2 items-center mb-2">
-                  <input
-                    className="input-field flex-1 text-sm py-2"
-                    value={c.prodotto}
-                    onChange={e=>updComposizione(i,'prodotto',e.target.value)}
-                    placeholder="Nome prodotto (es. Unica wax 1kg)"
-                  />
-                  <div className="flex items-center bg-white border border-gray-200 rounded-xl shrink-0">
-                    <button onClick={()=>updComposizione(i,'qta',Math.max(1,c.qta-1))} className="px-2 py-2 text-gray-500 text-sm font-bold">−</button>
-                    <input type="number" min="1"
-                      className="w-10 text-center font-bold text-sm border-none outline-none"
-                      value={c.qta}
-                      onChange={e=>updComposizione(i,'qta',e.target.value)}
-                    />
-                    <button onClick={()=>updComposizione(i,'qta',c.qta+1)} className="px-2 py-2 text-gray-500 text-sm font-bold">+</button>
+                <div key={i} className="mb-2">
+                  <div className="flex gap-2 items-center">
+                    <select
+                      className={`input-field flex-1 text-sm py-2 ${!c.prodottoId ? 'border-red-300 bg-red-50' : ''}`}
+                      value={c.prodottoId || ''}
+                      onChange={e=>selezionaProdotto(i, e.target.value)}
+                    >
+                      <option value="">— Scegli dal listino —</option>
+                      {categorieListino.map(cat => (
+                        <optgroup key={cat} label={cat}>
+                          {listino.filter(p => (p.categoria || 'Altro') === cat).map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.nome}{p.formato ? ` (${p.formato})` : ''}{p.codice ? ` · ${p.codice}` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <div className="flex items-center bg-white border border-gray-200 rounded-xl shrink-0">
+                      <button onClick={()=>updQta(i, (c.qta||1)-1)} className="px-2 py-2 text-gray-500 text-sm font-bold">−</button>
+                      <input type="number" min="1"
+                        className="w-10 text-center font-bold text-sm border-none outline-none"
+                        value={c.qta}
+                        onChange={e=>updQta(i, e.target.value)}
+                      />
+                      <button onClick={()=>updQta(i, (c.qta||1)+1)} className="px-2 py-2 text-gray-500 text-sm font-bold">+</button>
+                    </div>
+                    <button onClick={()=>delComposizione(i)} className="p-2 text-red-400 active:scale-95">
+                      <Trash2 size={16}/>
+                    </button>
                   </div>
-                  <button onClick={()=>delComposizione(i)} className="p-2 text-red-400 active:scale-95">
-                    <Trash2 size={16}/>
-                  </button>
+                  {!c.prodottoId && c.prodotto && (
+                    <div className="text-xs text-red-500 mt-1 ml-1">⚠️ Prima era scritto: "{c.prodotto}" — riselezionalo dal listino</div>
+                  )}
                 </div>
               ))}
 
+              {listino.length === 0 && (
+                <div className="text-xs text-red-500 mt-1">Nessun prodotto nel listino {form.brand}</div>
+              )}
+
               {(form.composizione||[]).length > 0 && (
                 <div className="mt-2 bg-blue-100 rounded-lg p-2 text-xs text-blue-700">
-                  Totale componenti: {form.composizione.reduce((s,c)=>s+c.qta,0)} pz
+                  Totale componenti: {form.composizione.reduce((s,c)=>s+(c.qta||0),0)} pz
                 </div>
               )}
             </div>
