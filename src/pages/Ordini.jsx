@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
-import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, Send, Package } from 'lucide-react'
+import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, Send, Package, RefreshCw } from 'lucide-react'
 import OrdineModal from '../components/OrdineModal'
+import emailjs from '@emailjs/browser'
+import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml } from '../emailConfig'
 
 const STATI = {
   'Preventivo': { bg: 'bg-gray-100',  border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
@@ -20,6 +22,7 @@ export default function Ordini() {
   const [filtroStato, setFiltroStato] = useState('')
   const [modal, setModal] = useState(null)
   const [espanso, setEspanso] = useState(null)
+  const [inviando, setInviando] = useState(null)
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'ordini'), snap => {
@@ -63,6 +66,45 @@ export default function Ordini() {
     if (!ts) return ''
     const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts)
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  }
+
+  const rispedisciEmail = async (o, soloAzienda = false) => {
+    const cliente = clienti.find(c => c.id === o.clienteId)
+    const emailC = cliente?.email || o.clienteEmail
+    const destinatari = soloAzienda
+      ? [EMAIL_AZIENDA]
+      : [emailC, EMAIL_AZIENDA].filter(Boolean)
+
+    if (!destinatari.length) return alert('Nessun destinatario trovato')
+    setInviando(o.id)
+    try {
+      const pagamentoCompleto = [o.clientePagamento, o.notePagamento].filter(Boolean).join(' - ') || '-'
+      const giornoChiusura = o.clienteGiornoChiusura && o.clienteGiornoChiusura !== '—'
+        ? `⚠️ ATTENZIONE: Cliente chiuso il ${o.clienteGiornoChiusura}` : ''
+      for (const dest of destinatari) {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          to_email: dest,
+          brand: o.brand || '',
+          logo_url: getLogoUrl(o.brand),
+          cliente_nome: o.clienteNome,
+          indirizzo: o.indirizzoConsegna || '-',
+          pagamento: pagamentoCompleto,
+          data_consegna: o.dataConsegna || '-',
+          giorno_chiusura: giornoChiusura,
+          dati_cliente_html: '',
+          righe_html: buildRigheHtml(o.righe || []),
+          totale_netto: Number(o.totaleNetto||0).toFixed(2),
+          totale_iva: Number(o.totaleIVA||0).toFixed(2),
+          totale_lordo: Number(o.totaleLordo||0).toFixed(2),
+          note: o.note || '',
+        }, EMAILJS_PUBLIC_KEY)
+      }
+      alert('✅ Email rispedita con successo!')
+    } catch (err) {
+      alert('❌ Errore: ' + (err.text || err.message))
+    } finally {
+      setInviando(null)
+    }
   }
 
   const inviaEmailOrdine = (o) => {
@@ -204,6 +246,26 @@ export default function Ordini() {
                         <Send size={20}/> 📤 Conferma Ordine
                       </button>
                     )}
+
+                    {/* RISPEDISCI per ordini Spedito */}
+                    {o.stato === 'Spedito' && (
+                      <div className="flex flex-col gap-2">
+                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wide">🔄 Rispedisci ordine</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => rispedisciEmail(o, true)} disabled={inviando === o.id}
+                            className="bg-orange-500 text-white font-bold py-3 rounded-2xl text-xs active:scale-95 flex items-center justify-center gap-1">
+                            {inviando === o.id ? <RefreshCw size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
+                            Solo Azienda
+                          </button>
+                          <button onClick={() => rispedisciEmail(o, false)} disabled={inviando === o.id}
+                            className="bg-purple-500 text-white font-bold py-3 rounded-2xl text-xs active:scale-95 flex items-center justify-center gap-1">
+                            {inviando === o.id ? <RefreshCw size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
+                            Tutti
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {o.righe?.length > 0 && (
                       <div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
@@ -212,7 +274,9 @@ export default function Ordini() {
                         {o.righe.map((r, i) => (
                           <div key={i} className="flex justify-between items-center text-sm py-1.5 border-b border-gray-50 last:border-0">
                             <span className="text-gray-700 font-medium">{r.qta} × {r.nome}</span>
-                            <span className="font-bold text-gray-900">€{(r.qta * r.prezzoUnitario).toFixed(2)}</span>
+                            <span className="font-bold text-gray-900">
+                              {r.omaggio ? '🎁 OMAGGIO' : `€${(r.qta * r.prezzoUnitario).toFixed(2)}`}
+                            </span>
                           </div>
                         ))}
                         <div className="mt-2 bg-gray-800 text-white rounded-xl p-3 text-sm">

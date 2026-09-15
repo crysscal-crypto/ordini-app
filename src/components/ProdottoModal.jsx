@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
 
-const CATEGORIE = ['Prodotti Cabina','Prodotti Domiciliari','Kit Iniziali','Promo Riordino','Merchandising','Promozioni 2025','Altro']
+const CATEGORIE = ['Prodotti Cabina','Prodotti Domiciliari','Kit Iniziali','Promo Riordino','Merchandising','Promozioni','Altro']
 const BRAND = ['Coco Cera', 'Callus Stop', 'Unica Wax']
 const FORMATI = ['pz','kg','g','ml','l','cf','kit','box','flacone','tubetto','bustina','altro']
 const vuoto = { codice:'', nome:'', categoria:'Prodotti Cabina', formato:'', prezzo:'', provvigione:'', unita:'pz', brand:'Coco Cera' }
