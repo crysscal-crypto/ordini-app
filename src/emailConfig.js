@@ -2,6 +2,8 @@ export const EMAILJS_SERVICE_ID = 'service_bmpzvds'
 export const EMAILJS_TEMPLATE_ID = 'template_2svbn57'
 export const EMAILJS_PUBLIC_KEY = '9XeEtS6GWSFd7izYG'
 
+export const NOTA_SPEDIZIONE = 'Gli importi indicati non comprendono le spese di spedizione.'
+
 export const LOGHI_BRAND = {
   'Coco Cera': '/loghi/coco-cera.png',
   'Callus Stop': '/loghi/callus-stop.png',
@@ -14,7 +16,7 @@ export function getLogoUrl(brand) {
 }
 
 export function buildRigheHtml(righe) {
-  return righe.map(r => `
+  const righeHtml = righe.map(r => `
     <tr style="background:${r.omaggio ? '#f0fdf4' : 'white'}">
       <td style="padding:8px; border-bottom:1px solid #eee; font-size:13px;">${r.codice || '-'}</td>
       <td style="padding:8px; border-bottom:1px solid #eee; font-size:13px;">${r.nome}${r.omaggio ? ' <span style="background:#22c55e;color:white;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">OMAGGIO</span>' : ''}</td>
@@ -23,6 +25,16 @@ export function buildRigheHtml(righe) {
       <td style="padding:8px; border-bottom:1px solid #eee; font-size:13px; text-align:right; font-weight:bold;">${r.omaggio ? 'OMAGGIO' : '€ ' + (r.qta * r.prezzoUnitario).toFixed(2)}</td>
     </tr>
   `).join('')
+
+  const notaHtml = `
+    <tr>
+      <td colspan="5" style="padding:10px 8px; background:#fffbeb; border-top:2px solid #fbbf24; font-size:13px; color:#92400e; font-weight:bold;">
+        ⚠️ ${NOTA_SPEDIZIONE}
+      </td>
+    </tr>
+  `
+
+  return righeHtml + notaHtml
 }
 
 export function buildDatiClienteHtml(cliente) {

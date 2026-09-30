@@ -4,7 +4,7 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimest
 import { Plus, Search, Trash2, Edit2, MapPin, FileText, ChevronDown, ChevronUp, Send, Package, RefreshCw } from 'lucide-react'
 import OrdineModal from '../components/OrdineModal'
 import emailjs from '@emailjs/browser'
-import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml } from '../emailConfig'
+import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, getLogoUrl, buildRigheHtml, NOTA_SPEDIZIONE } from '../emailConfig'
 
 const STATI = {
   'Preventivo': { bg: 'bg-gray-100',  border: 'border-l-gray-400',   pill: 'bg-gray-100 text-gray-700'    },
@@ -81,6 +81,7 @@ export default function Ordini() {
       const pagamentoCompleto = [o.clientePagamento, o.notePagamento].filter(Boolean).join(' - ') || '-'
       const giornoChiusura = o.clienteGiornoChiusura && o.clienteGiornoChiusura !== '—'
         ? `⚠️ ATTENZIONE: Cliente chiuso il ${o.clienteGiornoChiusura}` : ''
+      const noteComplete = [o.note, NOTA_SPEDIZIONE].filter(Boolean).join(' — ')
       for (const dest of destinatari) {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           to_email: dest,
@@ -96,7 +97,7 @@ export default function Ordini() {
           totale_netto: Number(o.totaleNetto||0).toFixed(2),
           totale_iva: Number(o.totaleIVA||0).toFixed(2),
           totale_lordo: Number(o.totaleLordo||0).toFixed(2),
-          note: o.note || '',
+          note: noteComplete,
         }, EMAILJS_PUBLIC_KEY)
       }
       alert('✅ Email rispedita con successo!')
@@ -113,7 +114,7 @@ export default function Ordini() {
     const righeText = (o.righe || []).map(r =>
       `- ${r.nome} (${r.codice||''}) x${r.qta} = €${(r.qta * r.prezzoUnitario).toFixed(2)}`
     ).join('\n')
-    const body = `AGENTE: CALIUMI CRISTIAN\nBrand: ${o.brand||''}\n\nCliente: ${o.clienteNome}\n${o.indirizzoConsegna?'Indirizzo: '+o.indirizzoConsegna+'\n':''}${o.dataConsegna?'Data consegna: '+o.dataConsegna+'\n':''}Pagamento: ${o.clientePagamento||''}\n\nPRODOTTI:\n${righeText}\n\nImponibile: €${Number(o.totaleNetto||0).toFixed(2)}\nIVA 22%:    €${Number(o.totaleIVA||0).toFixed(2)}\nTOTALE:     €${Number(o.totaleLordo||0).toFixed(2)}\n\n${o.note?'Note: '+o.note:''}\n\nCordiali saluti\nAgente Caliumi Cristian\nordini@cococera.it`
+    const body = `AGENTE: CALIUMI CRISTIAN\nBrand: ${o.brand||''}\n\nCliente: ${o.clienteNome}\n${o.indirizzoConsegna?'Indirizzo: '+o.indirizzoConsegna+'\n':''}${o.dataConsegna?'Data consegna: '+o.dataConsegna+'\n':''}Pagamento: ${o.clientePagamento||''}\n\nPRODOTTI:\n${righeText}\n\nImponibile: €${Number(o.totaleNetto||0).toFixed(2)}\nIVA 22%:    €${Number(o.totaleIVA||0).toFixed(2)}\nTOTALE:     €${Number(o.totaleLordo||0).toFixed(2)}\n\n⚠️ ${NOTA_SPEDIZIONE}\n\n${o.note?'Note: '+o.note:''}\n\nCordiali saluti\nAgente Caliumi Cristian\nordini@cococera.it`
     const dest = []
     if (o.invioEmail === 'cliente' || o.invioEmail === 'entrambi') dest.push(emailCliente)
     if (o.invioEmail === 'azienda' || o.invioEmail === 'entrambi') dest.push(EMAIL_AZIENDA)
@@ -283,6 +284,9 @@ export default function Ordini() {
                           <div className="flex justify-between mb-1"><span className="text-gray-300">Imponibile</span><span>€{Number(o.totaleNetto||0).toFixed(2)}</span></div>
                           <div className="flex justify-between mb-1"><span className="text-gray-300">IVA 22%</span><span>€{Number(o.totaleIVA||0).toFixed(2)}</span></div>
                           <div className="flex justify-between font-bold text-base border-t border-gray-600 pt-1 mt-1"><span>Totale</span><span className="text-blue-300">€{Number(o.totaleLordo||0).toFixed(2)}</span></div>
+                        </div>
+                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2">
+                          ⚠️ {NOTA_SPEDIZIONE}
                         </div>
                       </div>
                     )}
