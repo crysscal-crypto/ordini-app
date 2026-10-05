@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore'
-import { Plus, Search, Trash2, Edit2, Upload, Tag, Star, Check } from 'lucide-react'
+import { Plus, Search, Trash2, Edit2, Upload, Tag, Star, Check, Euro } from 'lucide-react'
 import ProdottoModal from '../components/ProdottoModal'
 import * as XLSX from 'xlsx'
 
@@ -13,6 +13,8 @@ const CAT_COLORS = {
   'Merchandising':'bg-purple-100 text-purple-700','Promozioni':'bg-red-100 text-red-700',
 }
 
+const norm = (v) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+
 export default function Prodotti() {
   const [prodotti, setProdotti] = useState([])
   const [search, setSearch] = useState('')
@@ -20,10 +22,12 @@ export default function Prodotti() {
   const [catFiltro, setCatFiltro] = useState('')
   const [modal, setModal] = useState(null)
   const [importando, setImportando] = useState(false)
+  const [aggiornando, setAggiornando] = useState(false)
   const [selezionati, setSelezionati] = useState([])
   const [nuovaProvv, setNuovaProvv] = useState('')
   const [editProvv, setEditProvv] = useState(null)
   const fileRef = useRef()
+  const prezziRef = useRef()
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'prodotti'), snap => {
@@ -92,6 +96,67 @@ export default function Prodotti() {
     alert('✅ Categorie aggiornate!')
   }
 
+  // ---- AGGIORNA SOLO I PREZZI DA EXCEL (modulo d'ordine) ----
+  const aggiornaPrezzi = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setAggiornando(true)
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const righe = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true })
+
+      // Righe valide: colonna A = codice, colonna B = nome, colonna D = prezzo
+      const listino = []
+      righe.forEach(r => {
+        const codice = String(r[0] ?? '').trim()
+        const nome = String(r[1] ?? '').trim()
+        const prezzo = parseFloat(String(r[3] ?? '').replace(',', '.'))
+        if (!nome) return
+        if (norm(codice) === 'codice') return
+        if (!isFinite(prezzo) || prezzo <= 0) return
+        listino.push({ codice, nome, prezzo })
+      })
+
+      if (!listino.length) { alert('Nessun prezzo trovato nel file'); return }
+
+      const delBrand = prodotti.filter(p => (p.brand || 'Coco Cera') === brandFiltro)
+      const cambi = []
+      const nonTrovati = []
+      const usati = new Set()
+
+      listino.forEach(l => {
+        let match = l.codice
+          ? delBrand.find(p => norm(p.codice) && norm(p.codice) === norm(l.codice) && !usati.has(p.id))
+          : null
+        if (!match) match = delBrand.find(p => norm(p.nome) === norm(l.nome) && !usati.has(p.id))
+        if (!match) { nonTrovati.push(`${l.codice || '-'} · ${l.nome}`); return }
+        usati.add(match.id)
+        const vecchio = Number(match.prezzo) || 0
+        if (Math.abs(vecchio - l.prezzo) > 0.009) {
+          cambi.push({ id: match.id, nome: match.nome, codice: match.codice || '', vecchio, nuovo: l.prezzo })
+        }
+      })
+
+      if (!cambi.length) {
+        alert(`Nessun prezzo da cambiare in ${brandFiltro}.\nRighe lette: ${listino.length}\nNon abbinate: ${nonTrovati.length}`)
+        return
+      }
+
+      const elenco = cambi.slice(0, 40).map(c => `${c.codice ? c.codice + ' · ' : ''}${c.nome}: € ${c.vecchio.toFixed(2)} → € ${c.nuovo.toFixed(2)}`).join('\n')
+      const extra = cambi.length > 40 ? `\n...e altri ${cambi.length - 40}` : ''
+      const avviso = nonTrovati.length ? `\n\n⚠️ ${nonTrovati.length} righe del file non abbinate (restano invariate).` : ''
+      if (!confirm(`Aggiornare ${cambi.length} prezzi in ${brandFiltro}?\n\n${elenco}${extra}${avviso}`)) return
+
+      const batch = writeBatch(db)
+      cambi.forEach(c => batch.update(doc(db,'prodotti',c.id), { prezzo: c.nuovo, aggiornatoAl: serverTimestamp() }))
+      await batch.commit()
+
+      alert(`✅ Aggiornati ${cambi.length} prezzi.${nonTrovati.length ? `\n\nNon abbinate:\n${nonTrovati.slice(0,25).join('\n')}${nonTrovati.length>25?`\n...e altre ${nonTrovati.length-25}`:''}` : ''}`)
+    } catch (err) { alert('Errore: ' + err.message) }
+    finally { setAggiornando(false); e.target.value = '' }
+  }
+
   const importaExcel = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setImportando(true)
@@ -145,12 +210,16 @@ export default function Prodotti() {
               🔄 Migra
             </button>
           )}
+          <button onClick={()=>prezziRef.current.click()} className="btn-warning" disabled={aggiornando} title="Aggiorna solo i prezzi da Excel">
+            <Euro size={18}/> {aggiornando?'...':'Prezzi'}
+          </button>
           <button onClick={()=>fileRef.current.click()} className="btn-warning" disabled={importando}>
             <Upload size={18}/> {importando?'...':'Excel'}
           </button>
           <button onClick={()=>setModal('nuovo')} className="btn-primary"><Plus size={20}/></button>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importaExcel}/>
+        <input ref={prezziRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={aggiornaPrezzi}/>
       </div>
 
       <div className="flex gap-2 mb-3">
